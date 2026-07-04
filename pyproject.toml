@@ -1,5 +1,5 @@
 [tool.flet]
-app = { path = "src" }
+app_dir = "src"
 
 [tool.flet.android]
 package_name = "com.kenooff.logisticapp"
