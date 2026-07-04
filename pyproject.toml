@@ -1,4 +1,3 @@
-toml
 [tool.flet]
 app = { path = "src" }
 
