@@ -1,0 +1,7 @@
+toml
+[tool.flet]
+app = { path = "src" }
+
+[tool.flet.android]
+package_name = "com.kenooff.logisticapp"
+app_title = "Kenooff Logistics
