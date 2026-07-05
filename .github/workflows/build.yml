@@ -27,14 +27,17 @@ jobs:
         with:
           flutter-version: '3.22.0'
 
-      - name: Build APK via Flet
+      - name: Auto-Create Flet Configuration
         run: |
-          cd src
-          flet build apk --yes
+          echo '[tool.flet]' > pyproject.toml
+          echo 'app_dir = "src"' >> pyproject.toml
+
+      - name: Build APK via Flet
+        run: flet build apk --yes
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-release
-          path: src/build/apk/*.apk
+          path: build/apk/*.apk
           if-no-files-found: error
