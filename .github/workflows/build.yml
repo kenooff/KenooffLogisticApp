@@ -30,7 +30,7 @@ jobs:
       - name: Build APK via Flet
         run: |
           cd src
-          flet build apk --main main.py --yes
+          flet build apk --yes
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
