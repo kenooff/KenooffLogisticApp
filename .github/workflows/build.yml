@@ -27,11 +27,6 @@ jobs:
         with:
           flutter-version: '3.22.0'
 
-      - name: Auto-Create Flet Configuration
-        run: |
-          echo '[tool.flet]' > pyproject.toml
-          echo 'app_dir = "src"' >> pyproject.toml
-
       - name: Build APK via Flet
         run: flet build apk --yes
 

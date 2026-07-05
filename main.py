@@ -1,14 +1,19 @@
 import flet as ft
+import time
 
 def main(page: ft.Page):
+    # 1. Base engine configurations
     page.title = "Kenooff Logistics"
-    page.padding = 16
+    page.theme_mode = ft.ThemeMode.LIGHT
+    page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
+    
+    # 2. Prevent mobile startup race condition 
+    time.sleep(0.5)
 
-    # 1. Main Form Titles
+    # 3. Create Form Elements
     header = ft.Text("Kenooff Logistics Form", size=24, weight=ft.FontWeight.BOLD, color=ft.colors.BLUE_800)
     subheader = ft.Text("Log New Package Entry", size=14, color=ft.colors.GREY_600)
 
-    # 2. Form Input Fields
     vendor_input = ft.TextField(label="Vendor Name", border_radius=8)
     package_input = ft.TextField(label="Package Description", border_radius=8)
     qty_input = ft.TextField(label="Quantity", value="1", keyboard_type=ft.KeyboardType.NUMBER, border_radius=8)
@@ -32,10 +37,8 @@ def main(page: ft.Page):
         border_radius=8
     )
 
-    # 3. Calculation Display Banner
     total_badge = ft.Text("Total Value: ₦0.00", size=18, weight=ft.FontWeight.BOLD, color=ft.colors.GREEN_700)
 
-    # 4. Calculation Logic
     def run_calculation(e):
         try:
             qty = float(qty_input.value) if qty_input.value else 0
@@ -53,7 +56,6 @@ def main(page: ft.Page):
         style=ft.ButtonStyle(color=ft.colors.GREEN_700)
     )
 
-    # 5. Save/Submit Action
     def handle_submit(e):
         page.snack_bar = ft.SnackBar(
             content=ft.Text("Package Saved Successfully!", color=ft.colors.WHITE), 
@@ -69,32 +71,37 @@ def main(page: ft.Page):
         style=ft.ButtonStyle(bgcolor=ft.colors.BLUE_800, color=ft.colors.WHITE)
     )
 
-    # 6. Mobile Layout Context
-    app_layout = ft.ListView(
-        expand=True,
-        spacing=14,
-        controls=[
-            header,
-            subheader,
-            ft.Divider(height=10),
-            vendor_input,
-            package_input,
-            qty_input,
-            price_input,
-            ft.Container(height=5),
-            total_badge,
-            calc_btn,                  
-            ft.Divider(height=10),
-            location_input,
-            rider_input,
-            delivery_charge,
-            payment_method,
-            initial_status,
-            ft.Container(height=10),
-            ft.Row([ft.Expanded(child=submit_btn)])
-        ]
+    # 4. Wrap everything inside a single master scrollable view box
+    master_layout = ft.Container(
+        content=ft.ListView(
+            spacing=14,
+            controls=[
+                header,
+                subheader,
+                ft.Divider(height=10),
+                vendor_input,
+                package_input,
+                qty_input,
+                price_input,
+                ft.Container(height=5),
+                total_badge,
+                calc_btn,                  
+                ft.Divider(height=10),
+                location_input,
+                rider_input,
+                delivery_charge,
+                payment_method,
+                initial_status,
+                ft.Container(height=10),
+                ft.Row([ft.Expanded(child=submit_btn)])
+            ]
+        ),
+        padding=16,
+        expand=True
     )
 
-    page.add(app_layout)
+    page.clean()
+    page.add(master_layout)
+    page.update()
 
 ft.app(target=main)
