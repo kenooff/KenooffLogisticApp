@@ -1,37 +1,38 @@
 name: Build Android APK
-on: [push, workflow_dispatch] 
+on: [push, workflow_dispatch]
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4 
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11' 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
 
-      - name: Install Latest Flet
-        run: pip install --upgrade flet 
+      - name: Install Latest Flet
+        run: pip install --upgrade flet
 
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17' 
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
 
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.22.0' 
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.0'
 
-      - name: Build APK via Flet
-        run: flet build apk --yes 
+      - name: Build APK via Flet
+        run: flet build apk --yes
 
-      - name: Bypass Storage Quota & Generate Link
-        run: |
-          echo "=== YOUR DOWNLOAD LINK IS BELOW ==="
-          curl https://bashupload.com/KenooffLogistics.apk --data-binary @build/apk/*.apk
-          echo "===================================="
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release
+          path: build/apk/*.apk
+          if-no-files-found: error
