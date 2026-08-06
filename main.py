@@ -10,9 +10,9 @@ def main(page: ft.Page):
     # 2. Prevent mobile startup race condition 
     time.sleep(0.5)
 
-    # 3. Create Form Elements
-    header = ft.Text("Kenooff Logistics Form", size=24, weight=ft.FontWeight.BOLD, color=ft.colors.BLUE_800)
-    subheader = ft.Text("Log New Package Entry", size=14, color=ft.colors.GREY_600)
+    # 3. Create Form Elements (Updated to capitalized ft.Colors and ft.Icons)
+    header = ft.Text("Kenooff Logistics Form", size=24, weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_800)
+    subheader = ft.Text("Log New Package Entry", size=14, color=ft.Colors.GREY_600)
 
     vendor_input = ft.TextField(label="Vendor Name", border_radius=8)
     package_input = ft.TextField(label="Package Description", border_radius=8)
@@ -37,7 +37,7 @@ def main(page: ft.Page):
         border_radius=8
     )
 
-    total_badge = ft.Text("Total Value: ₦0.00", size=18, weight=ft.FontWeight.BOLD, color=ft.colors.GREEN_700)
+    total_badge = ft.Text("Total Value: ₦0.00", size=18, weight=ft.FontWeight.BOLD, color=ft.Colors.GREEN_700)
 
     def run_calculation(e):
         try:
@@ -51,15 +51,15 @@ def main(page: ft.Page):
 
     calc_btn = ft.ElevatedButton(
         text="Calculate Total Value",
-        icon=ft.icons.CALCULATE,
+        icon=ft.Icons.CALCULATE,
         on_click=run_calculation,
-        style=ft.ButtonStyle(color=ft.colors.GREEN_700)
+        style=ft.ButtonStyle(color=ft.Colors.GREEN_700)
     )
 
     def handle_submit(e):
         page.snack_bar = ft.SnackBar(
-            content=ft.Text("Package Saved Successfully!", color=ft.colors.WHITE), 
-            bgcolor=ft.colors.GREEN_600
+            content=ft.Text("Package Saved Successfully!", color=ft.Colors.WHITE), 
+            bgcolor=ft.Colors.GREEN_600
         )
         page.snack_bar.open = True
         page.update()
@@ -68,7 +68,7 @@ def main(page: ft.Page):
         text="Log & Save Package",
         on_click=handle_submit,
         height=50,
-        style=ft.ButtonStyle(bgcolor=ft.colors.BLUE_800, color=ft.colors.WHITE)
+        style=ft.ButtonStyle(bgcolor=ft.Colors.BLUE_800, color=ft.Colors.WHITE)
     )
 
     # 4. Wrap everything inside a single master scrollable view box
@@ -105,3 +105,4 @@ def main(page: ft.Page):
     page.update()
 
 ft.app(target=main)
+
