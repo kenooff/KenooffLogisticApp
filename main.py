@@ -10,7 +10,7 @@ def main(page: ft.Page):
     # 2. Prevent mobile startup race condition 
     time.sleep(0.5)
 
-    # 3. Form Header & Title Elements (Updated to ft.Colors)
+    # 3. Form Header & Title Elements
     header = ft.Text("Kenooff Logistics Form", size=24, weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_800)
     subheader = ft.Text("Log New Package Entry", size=14, color=ft.Colors.GREY_600)
 
@@ -52,8 +52,11 @@ def main(page: ft.Page):
         page.update()
 
     calc_btn = ft.ElevatedButton(
-        text="Calculate Total Value",
-        icon=ft.Icons.CALCULATE,
+        content=ft.Row(
+            [ft.Icon(ft.Icons.CALCULATE), ft.Text("Calculate Total Value")],
+            alignment=ft.MainAxisAlignment.CENTER,
+            tight=True,
+        ),
         on_click=run_calculation,
         style=ft.ButtonStyle(color=ft.Colors.GREEN_700)
     )
@@ -67,10 +70,10 @@ def main(page: ft.Page):
         page.update()
 
     submit_btn = ft.ElevatedButton(
-        text="Log & Save Package",
+        content=ft.Text("Log & Save Package", color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD),
         on_click=handle_submit,
         height=50,
-        style=ft.ButtonStyle(bgcolor=ft.Colors.BLUE_800, color=ft.Colors.WHITE)
+        style=ft.ButtonStyle(bgcolor=ft.Colors.BLUE_800)
     )
 
     # 4. Scrollable Container Layout
