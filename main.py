@@ -10,10 +10,11 @@ def main(page: ft.Page):
     # 2. Prevent mobile startup race condition 
     time.sleep(0.5)
 
-    # 3. Create Form Elements (Updated to capitalized ft.Colors and ft.Icons)
+    # 3. Form Header & Title Elements (Updated to ft.Colors)
     header = ft.Text("Kenooff Logistics Form", size=24, weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_800)
     subheader = ft.Text("Log New Package Entry", size=14, color=ft.Colors.GREY_600)
 
+    # Input Fields
     vendor_input = ft.TextField(label="Vendor Name", border_radius=8)
     package_input = ft.TextField(label="Package Description", border_radius=8)
     qty_input = ft.TextField(label="Quantity", value="1", keyboard_type=ft.KeyboardType.NUMBER, border_radius=8)
@@ -39,6 +40,7 @@ def main(page: ft.Page):
 
     total_badge = ft.Text("Total Value: ₦0.00", size=18, weight=ft.FontWeight.BOLD, color=ft.Colors.GREEN_700)
 
+    # Calculation logic
     def run_calculation(e):
         try:
             qty = float(qty_input.value) if qty_input.value else 0
@@ -71,7 +73,7 @@ def main(page: ft.Page):
         style=ft.ButtonStyle(bgcolor=ft.Colors.BLUE_800, color=ft.Colors.WHITE)
     )
 
-    # 4. Wrap everything inside a single master scrollable view box
+    # 4. Scrollable Container Layout
     master_layout = ft.Container(
         content=ft.ListView(
             spacing=14,
@@ -105,4 +107,3 @@ def main(page: ft.Page):
     page.update()
 
 ft.app(target=main)
-
