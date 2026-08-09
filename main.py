@@ -199,7 +199,7 @@ def main(page: ft.Page):
             history_list.controls.append(
                 ft.Container(
                     content=ft.Text("No saved packages found in database.", italic=True, color=ft.Colors.GREY_500),
-                    alignment=ft.Alignment.CENTER,  # FIXED: Capital Alignment class with uppercase CENTER constant
+                    alignment=ft.Alignment.CENTER,
                     padding=20
                 )
             )
@@ -245,18 +245,18 @@ def main(page: ft.Page):
     # Initial Data Load
     load_database_records()
 
-    # Tabs Interface
+    # Tabs Interface (Updated to use label= instead of text=)
     tabs = ft.Tabs(
         selected_index=0,
         animation_duration=300,
         tabs=[
             ft.Tab(
-                text="New Log",
+                label="New Log",
                 icon=ft.Icons.ADD_BOX,
                 content=ft.Container(content=form_view, padding=12)
             ),
             ft.Tab(
-                text="View History",
+                label="View History",
                 icon=ft.Icons.HISTORY,
                 content=ft.Container(content=history_list, padding=12)
             ),
