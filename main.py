@@ -199,7 +199,7 @@ def main(page: ft.Page):
             history_list.controls.append(
                 ft.Container(
                     content=ft.Text("No saved packages found in database.", italic=True, color=ft.Colors.GREY_500),
-                    alignment=ft.alignment.Center,  # FIXED: ft.alignment.Center capitalized
+                    alignment=ft.Alignment.CENTER,  # FIXED: Capital Alignment class with uppercase CENTER constant
                     padding=20
                 )
             )
