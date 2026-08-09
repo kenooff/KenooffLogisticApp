@@ -1,7 +1,6 @@
 import flet as ft
 import sqlite3
 import time
-import os
 
 # 1. Initialize Local SQLite Database
 def init_db():
@@ -27,19 +26,25 @@ def init_db():
     conn.close()
 
 def main(page: ft.Page):
-    # Setup Database
     init_db()
 
     page.title = "Kenooff Logistics"
     page.theme_mode = ft.ThemeMode.LIGHT
     page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
-    
-    time.sleep(0.5)
 
-    header = ft.Text("Kenooff Logistics Form", size=24, weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_800)
-    subheader = ft.Text("Log New Package Entry", size=14, color=ft.Colors.GREY_600)
+    time.sleep(0.3)
 
-    # Input Controls
+    # Toast/Snackbar Alert Helper
+    def show_alert(message: str, bg_color):
+        snack = ft.SnackBar(
+            content=ft.Text(message, color=ft.Colors.WHITE),
+            bgcolor=bg_color,
+            open=True
+        )
+        page.overlay.append(snack)
+        page.update()
+
+    # ==================== FORM INPUT CONTROLS ====================
     vendor_input = ft.TextField(label="Vendor Name", border_radius=8)
     package_input = ft.TextField(label="Package Description", border_radius=8)
     qty_input = ft.TextField(label="Quantity", value="1", keyboard_type=ft.KeyboardType.NUMBER, border_radius=8)
@@ -88,19 +93,7 @@ def main(page: ft.Page):
         style=ft.ButtonStyle(color=ft.Colors.GREEN_700)
     )
 
-    # Helper function to open snackbars reliably
-    def show_alert(message: str, bg_color):
-        snack = ft.SnackBar(
-            content=ft.Text(message, color=ft.Colors.WHITE),
-            bgcolor=bg_color,
-            open=True
-        )
-        page.overlay.append(snack)
-        page.update()
-
-    # REAL SUBMIT & SAVE HANDLER
     def handle_submit(e):
-        # 1. Validation check
         if not vendor_input.value or not package_input.value:
             show_alert("Please fill in Vendor Name and Package Description!", ft.Colors.RED_600)
             return
@@ -111,7 +104,6 @@ def main(page: ft.Page):
             del_charge = float(delivery_charge.value) if delivery_charge.value else 0.0
             total_val = qty * price
 
-            # 2. Save into SQLite Database
             conn = sqlite3.connect("logistics.db")
             cursor = conn.cursor()
             cursor.execute("""
@@ -134,7 +126,7 @@ def main(page: ft.Page):
             conn.commit()
             conn.close()
 
-            # 3. Clear inputs after saving
+            # Clear inputs
             vendor_input.value = ""
             package_input.value = ""
             qty_input.value = "1"
@@ -145,6 +137,7 @@ def main(page: ft.Page):
             total_badge.value = "Total Value: ₦0.00"
 
             show_alert("Package Log Saved to Database Successfully!", ft.Colors.GREEN_600)
+            load_database_records()  # Refresh history view
 
         except Exception as ex:
             show_alert(f"Error saving entry: {str(ex)}", ft.Colors.RED_600)
@@ -157,37 +150,122 @@ def main(page: ft.Page):
         style=ft.ButtonStyle(bgcolor=ft.Colors.BLUE_800)
     )
 
-    # Main Scroll View
-    master_layout = ft.Container(
-        content=ft.ListView(
-            spacing=14,
-            controls=[
-                header,
-                subheader,
-                ft.Divider(height=10),
-                vendor_input,
-                package_input,
-                qty_input,
-                price_input,
-                ft.Container(height=5),
-                total_badge,
-                calc_btn,                  
-                ft.Divider(height=10),
-                location_input,
-                rider_input,
-                delivery_charge,
-                payment_method,
-                initial_status,
-                ft.Container(height=10),
-                ft.Row([submit_btn])
-            ]
-        ),
-        padding=16,
+    # Form Layout Tab
+    form_view = ft.ListView(
+        spacing=14,
+        controls=[
+            ft.Text("Kenooff Logistics Form", size=22, weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_800),
+            ft.Text("Log New Package Entry", size=14, color=ft.Colors.GREY_600),
+            ft.Divider(height=10),
+            vendor_input,
+            package_input,
+            qty_input,
+            price_input,
+            ft.Container(height=5),
+            total_badge,
+            calc_btn,                  
+            ft.Divider(height=10),
+            location_input,
+            rider_input,
+            delivery_charge,
+            payment_method,
+            initial_status,
+            ft.Container(height=10),
+            ft.Row([submit_btn])
+        ]
+    )
+
+    # ==================== DATA HISTORY TAB ====================
+    history_list = ft.ListView(spacing=10, expand=True)
+
+    def delete_record(record_id):
+        conn = sqlite3.connect("logistics.db")
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM packages WHERE id = ?", (record_id,))
+        conn.commit()
+        conn.close()
+        show_alert("Record deleted!", ft.Colors.GREY_700)
+        load_database_records()
+
+    def load_database_records():
+        history_list.controls.clear()
+        conn = sqlite3.connect("logistics.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, vendor, package_desc, total_value, location, rider, status, created_at FROM packages ORDER BY id DESC")
+        rows = cursor.fetchall()
+        conn.close()
+
+        if not rows:
+            history_list.controls.append(
+                ft.Container(
+                    content=ft.Text("No saved packages found in database.", italic=True, color=ft.Colors.GREY_500),
+                    alignment=ft.alignment.center,
+                    padding=20
+                )
+            )
+        else:
+            for row in rows:
+                pkg_id, vendor, desc, total, loc, rider, status, created = row
+                
+                status_color = ft.Colors.ORANGE_700
+                if status == "Delivered":
+                    status_color = ft.Colors.GREEN_700
+                elif status == "In Transit":
+                    status_color = ft.Colors.BLUE_700
+
+                card = ft.Card(
+                    content=ft.Container(
+                        padding=12,
+                        content=ft.Column([
+                            ft.Row([
+                                ft.Text(f"{vendor}", weight=ft.FontWeight.BOLD, size=16),
+                                ft.Container(
+                                    content=ft.Text(f" {status} ", color=ft.Colors.WHITE, size=12),
+                                    bgcolor=status_color,
+                                    border_radius=4,
+                                    padding=4
+                                )
+                            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+                            ft.Text(f"Item: {desc}", size=14),
+                            ft.Text(f"Location: {loc or 'N/A'} | Rider: {rider or 'N/A'}", size=12, color=ft.Colors.GREY_700),
+                            ft.Row([
+                                ft.Text(f"₦{total:,.2f}", weight=ft.FontWeight.BOLD, color=ft.Colors.GREEN_800),
+                                ft.IconButton(
+                                    icon=ft.Icons.DELETE_OUTLINED, 
+                                    icon_color=ft.Colors.RED_400,
+                                    on_click=lambda e, r_id=pkg_id: delete_record(r_id)
+                                )
+                            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
+                        ])
+                    )
+                )
+                history_list.controls.append(card)
+        page.update()
+
+    # Initial Data Load
+    load_database_records()
+
+    # Tabs Interface
+    tabs = ft.Tabs(
+        selected_index=0,
+        animation_duration=300,
+        tabs=[
+            ft.Tab(
+                text="New Log",
+                icon=ft.Icons.ADD_BOX,
+                content=ft.Container(content=form_view, padding=12)
+            ),
+            ft.Tab(
+                text="View History",
+                icon=ft.Icons.HISTORY,
+                content=ft.Container(content=history_list, padding=12)
+            ),
+        ],
         expand=True
     )
 
     page.clean()
-    page.add(master_layout)
+    page.add(tabs)
     page.update()
 
 ft.app(target=main)
