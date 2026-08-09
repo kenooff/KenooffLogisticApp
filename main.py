@@ -69,10 +69,12 @@ def main(page: ft.Page):
         page.snack_bar.open = True
         page.update()
 
+    # expand=True allows the button to expand across the row width naturally
     submit_btn = ft.ElevatedButton(
         content=ft.Text("Log & Save Package", color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD),
         on_click=handle_submit,
         height=50,
+        expand=True,
         style=ft.ButtonStyle(bgcolor=ft.Colors.BLUE_800)
     )
 
@@ -98,7 +100,7 @@ def main(page: ft.Page):
                 payment_method,
                 initial_status,
                 ft.Container(height=10),
-                ft.Row([ft.Expanded(child=submit_btn)])
+                ft.Row([submit_btn])
             ]
         ),
         padding=16,
