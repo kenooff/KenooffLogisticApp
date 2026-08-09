@@ -150,7 +150,7 @@ def main(page: ft.Page):
         style=ft.ButtonStyle(bgcolor=ft.Colors.BLUE_800)
     )
 
-    # Form Layout Tab
+    # Form Layout View
     form_view = ft.ListView(
         spacing=14,
         controls=[
@@ -175,7 +175,7 @@ def main(page: ft.Page):
         ]
     )
 
-    # ==================== DATA HISTORY TAB ====================
+    # ==================== DATA HISTORY VIEW ====================
     history_list = ft.ListView(spacing=10, expand=True)
 
     def delete_record(record_id):
@@ -242,36 +242,32 @@ def main(page: ft.Page):
                 history_list.controls.append(card)
         page.update()
 
-    # Initial Data Load
     load_database_records()
 
-    # Modern Tabs Interface (TabBar + TabBarView structure)
-    tabs_navigation = ft.Tabs(
-        length=2,
+    # Screen View Container
+    body = ft.Container(content=form_view, padding=12, expand=True)
+
+    # Bottom Navigation Handler
+    def on_nav_change(e):
+        idx = int(e.control.selected_index)
+        if idx == 0:
+            body.content = form_view
+        else:
+            load_database_records()
+            body.content = history_list
+        page.update()
+
+    page.navigation_bar = ft.NavigationBar(
         selected_index=0,
-        expand=True,
-        content=ft.Column(
-            expand=True,
-            controls=[
-                ft.TabBar(
-                    tabs=[
-                        ft.Tab(label="New Log", icon=ft.Icons.ADD_BOX),
-                        ft.Tab(label="View History", icon=ft.Icons.HISTORY),
-                    ]
-                ),
-                ft.TabBarView(
-                    expand=True,
-                    controls=[
-                        ft.Container(content=form_view, padding=12),
-                        ft.Container(content=history_list, padding=12),
-                    ],
-                ),
-            ],
-        ),
+        destinations=[
+            ft.NavigationBarDestination(icon=ft.Icons.ADD_BOX, label="New Log"),
+            ft.NavigationBarDestination(icon=ft.Icons.HISTORY, label="View History"),
+        ],
+        on_change=on_nav_change
     )
 
     page.clean()
-    page.add(tabs_navigation)
+    page.add(body)
     page.update()
 
-ft.app(target=main
+ft.app(target=main)
