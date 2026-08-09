@@ -245,27 +245,33 @@ def main(page: ft.Page):
     # Initial Data Load
     load_database_records()
 
-    # Tabs Interface (Updated to use label= instead of text=)
-    tabs = ft.Tabs(
+    # Modern Tabs Interface (TabBar + TabBarView structure)
+    tabs_navigation = ft.Tabs(
+        length=2,
         selected_index=0,
-        animation_duration=300,
-        tabs=[
-            ft.Tab(
-                label="New Log",
-                icon=ft.Icons.ADD_BOX,
-                content=ft.Container(content=form_view, padding=12)
-            ),
-            ft.Tab(
-                label="View History",
-                icon=ft.Icons.HISTORY,
-                content=ft.Container(content=history_list, padding=12)
-            ),
-        ],
-        expand=True
+        expand=True,
+        content=ft.Column(
+            expand=True,
+            controls=[
+                ft.TabBar(
+                    tabs=[
+                        ft.Tab(label="New Log", icon=ft.Icons.ADD_BOX),
+                        ft.Tab(label="View History", icon=ft.Icons.HISTORY),
+                    ]
+                ),
+                ft.TabBarView(
+                    expand=True,
+                    controls=[
+                        ft.Container(content=form_view, padding=12),
+                        ft.Container(content=history_list, padding=12),
+                    ],
+                ),
+            ],
+        ),
     )
 
     page.clean()
-    page.add(tabs)
+    page.add(tabs_navigation)
     page.update()
 
-ft.app(target=main)
+ft.app(target=main
