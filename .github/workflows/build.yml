@@ -13,8 +13,8 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install Latest Flet
-        run: pip install --upgrade flet
+      - name: Install Dependencies
+        run: pip install --upgrade flet supabase
 
       - name: Setup Java
         uses: actions/setup-java@v4

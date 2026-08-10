@@ -1,33 +1,19 @@
 import flet as ft
-import sqlite3
+from supabase import create_client, Client
 import time
 
-# 1. Initialize Local SQLite Database
-def init_db():
-    conn = sqlite3.connect("logistics.db")
-    cursor = conn.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS packages (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            vendor TEXT,
-            package_desc TEXT,
-            quantity REAL,
-            unit_price REAL,
-            total_value REAL,
-            location TEXT,
-            rider TEXT,
-            delivery_charge REAL,
-            payment_method TEXT,
-            status TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    conn.commit()
-    conn.close()
+# ==================== SUPABASE CLOUD CONFIG ====================
+SUPABASE_URL = "YOUR_SUPABASE_URL"  nkllvhzebktydnqvjuoc
+SUPABASE_KEY = "YOUR_SUPABASE_KEY"  eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5rbGx2aHplYmt0eWRucXZqdW9jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYyODQzNDMsImV4cCI6MjEwMTg2MDM0M30.zIPGzDv5krWPUaIJzTP2BnKhSxU5LjJ0DraR46zFFLI
+
+# Initialize Supabase Client
+try:
+    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+    use_cloud = True
+except Exception as e:
+    use_cloud = False
 
 def main(page: ft.Page):
-    init_db()
-
     page.title = "Kenooff Logistics"
     page.theme_mode = ft.ThemeMode.LIGHT
     page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
@@ -93,6 +79,7 @@ def main(page: ft.Page):
         style=ft.ButtonStyle(color=ft.Colors.GREEN_700)
     )
 
+    # SAVE TO CLOUD HANDLER
     def handle_submit(e):
         if not vendor_input.value or not package_input.value:
             show_alert("Please fill in Vendor Name and Package Description!", ft.Colors.RED_600)
@@ -104,27 +91,21 @@ def main(page: ft.Page):
             del_charge = float(delivery_charge.value) if delivery_charge.value else 0.0
             total_val = qty * price
 
-            conn = sqlite3.connect("logistics.db")
-            cursor = conn.cursor()
-            cursor.execute("""
-                INSERT INTO packages (
-                    vendor, package_desc, quantity, unit_price, total_value, 
-                    location, rider, delivery_charge, payment_method, status
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                vendor_input.value,
-                package_input.value,
-                qty,
-                price,
-                total_val,
-                location_input.value,
-                rider_input.value,
-                del_charge,
-                payment_method.value,
-                initial_status.value
-            ))
-            conn.commit()
-            conn.close()
+            data = {
+                "vendor": vendor_input.value,
+                "package_desc": package_input.value,
+                "quantity": qty,
+                "unit_price": price,
+                "total_value": total_val,
+                "location": location_input.value,
+                "rider": rider_input.value,
+                "delivery_charge": del_charge,
+                "payment_method": payment_method.value,
+                "status": initial_status.value
+            }
+
+            # Insert into Supabase Online Database
+            supabase.table("packages").insert(data).execute()
 
             # Clear inputs
             vendor_input.value = ""
@@ -136,11 +117,11 @@ def main(page: ft.Page):
             delivery_charge.value = "0"
             total_badge.value = "Total Value: ₦0.00"
 
-            show_alert("Package Log Saved to Database Successfully!", ft.Colors.GREEN_600)
-            load_database_records()  # Refresh history view
+            show_alert("Package Saved Online Successfully!", ft.Colors.GREEN_600)
+            load_database_records()
 
         except Exception as ex:
-            show_alert(f"Error saving entry: {str(ex)}", ft.Colors.RED_600)
+            show_alert(f"Error saving to Cloud: {str(ex)}", ft.Colors.RED_600)
 
     submit_btn = ft.ElevatedButton(
         content=ft.Text("Log & Save Package", color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD),
@@ -155,7 +136,7 @@ def main(page: ft.Page):
         spacing=14,
         controls=[
             ft.Text("Kenooff Logistics Form", size=22, weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_800),
-            ft.Text("Log New Package Entry", size=14, color=ft.Colors.GREY_600),
+            ft.Text("Log New Package Entry (Online Cloud)", size=14, color=ft.Colors.GREY_600),
             ft.Divider(height=10),
             vendor_input,
             package_input,
@@ -175,79 +156,116 @@ def main(page: ft.Page):
         ]
     )
 
-    # ==================== DATA HISTORY VIEW ====================
+    # ==================== DATA HISTORY & UPDATE VIEW ====================
     history_list = ft.ListView(spacing=10, expand=True)
 
+    # DELETE RECORD FROM CLOUD
     def delete_record(record_id):
-        conn = sqlite3.connect("logistics.db")
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM packages WHERE id = ?", (record_id,))
-        conn.commit()
-        conn.close()
-        show_alert("Record deleted!", ft.Colors.GREY_700)
-        load_database_records()
+        try:
+            supabase.table("packages").delete().eq("id", record_id).execute()
+            show_alert("Record deleted from Cloud!", ft.Colors.GREY_700)
+            load_database_records()
+        except Exception as ex:
+            show_alert(f"Failed to delete: {str(ex)}", ft.Colors.RED_600)
 
+    # UPDATE PACKAGE STATUS IN CLOUD
+    def update_status(record_id, new_status):
+        try:
+            supabase.table("packages").update({"status": new_status}).eq("id", record_id).execute()
+            show_alert(f"Status updated to '{new_status}'!", ft.Colors.GREEN_700)
+            load_database_records()
+        except Exception as ex:
+            show_alert(f"Failed to update status: {str(ex)}", ft.Colors.RED_600)
+
+    # FETCH RECORDS FROM CLOUD
     def load_database_records():
         history_list.controls.clear()
-        conn = sqlite3.connect("logistics.db")
-        cursor = conn.cursor()
-        cursor.execute("SELECT id, vendor, package_desc, total_value, location, rider, status, created_at FROM packages ORDER BY id DESC")
-        rows = cursor.fetchall()
-        conn.close()
+        try:
+            response = supabase.table("packages").select("*").order("id", desc=True).execute()
+            rows = response.data
 
-        if not rows:
+            if not rows:
+                history_list.controls.append(
+                    ft.Container(
+                        content=ft.Text("No saved packages found in online database.", italic=True, color=ft.Colors.GREY_500),
+                        alignment=ft.Alignment.CENTER,
+                        padding=20
+                    )
+                )
+            else:
+                for row in rows:
+                    pkg_id = row.get("id")
+                    vendor = row.get("vendor", "")
+                    desc = row.get("package_desc", "")
+                    total = row.get("total_value", 0.0) or 0.0
+                    loc = row.get("location", "")
+                    rider = row.get("rider", "")
+                    status = row.get("status", "Pending")
+
+                    status_color = ft.Colors.ORANGE_700
+                    if status == "Delivered":
+                        status_color = ft.Colors.GREEN_700
+                    elif status == "In Transit":
+                        status_color = ft.Colors.BLUE_700
+
+                    # Dynamic Status Change Dropdown Menu
+                    status_dropdown = ft.Dropdown(
+                        value=status,
+                        width=140,
+                        height=40,
+                        text_size=12,
+                        border_radius=6,
+                        options=[
+                            ft.dropdown.Option("Pending"),
+                            ft.dropdown.Option("In Transit"),
+                            ft.dropdown.Option("Delivered"),
+                        ],
+                        on_change=lambda e, r_id=pkg_id: update_status(r_id, e.control.value)
+                    )
+
+                    card = ft.Card(
+                        content=ft.Container(
+                            padding=12,
+                            content=ft.Column([
+                                ft.Row([
+                                    ft.Text(f"{vendor}", weight=ft.FontWeight.BOLD, size=16),
+                                    ft.Container(
+                                        content=ft.Text(f" {status} ", color=ft.Colors.WHITE, size=12),
+                                        bgcolor=status_color,
+                                        border_radius=4,
+                                        padding=4
+                                    )
+                                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+                                ft.Text(f"Item: {desc}", size=14),
+                                ft.Text(f"Location: {loc or 'N/A'} | Rider: {rider or 'N/A'}", size=12, color=ft.Colors.GREY_700),
+                                ft.Row([
+                                    ft.Text(f"₦{total:,.2f}", weight=ft.FontWeight.BOLD, color=ft.Colors.GREEN_800),
+                                    ft.Row([
+                                        status_dropdown,
+                                        ft.IconButton(
+                                            icon=ft.Icons.DELETE_OUTLINED, 
+                                            icon_color=ft.Colors.RED_400,
+                                            on_click=lambda e, r_id=pkg_id: delete_record(r_id)
+                                        )
+                                    ])
+                                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
+                            ])
+                        )
+                    )
+                    history_list.controls.append(card)
+        except Exception as ex:
             history_list.controls.append(
                 ft.Container(
-                    content=ft.Text("No saved packages found in database.", italic=True, color=ft.Colors.GREY_500),
-                    alignment=ft.Alignment.CENTER,
+                    content=ft.Text(f"Error connecting to Cloud Database: {str(ex)}", color=ft.Colors.RED_500),
                     padding=20
                 )
             )
-        else:
-            for row in rows:
-                pkg_id, vendor, desc, total, loc, rider, status, created = row
-                
-                status_color = ft.Colors.ORANGE_700
-                if status == "Delivered":
-                    status_color = ft.Colors.GREEN_700
-                elif status == "In Transit":
-                    status_color = ft.Colors.BLUE_700
-
-                card = ft.Card(
-                    content=ft.Container(
-                        padding=12,
-                        content=ft.Column([
-                            ft.Row([
-                                ft.Text(f"{vendor}", weight=ft.FontWeight.BOLD, size=16),
-                                ft.Container(
-                                    content=ft.Text(f" {status} ", color=ft.Colors.WHITE, size=12),
-                                    bgcolor=status_color,
-                                    border_radius=4,
-                                    padding=4
-                                )
-                            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-                            ft.Text(f"Item: {desc}", size=14),
-                            ft.Text(f"Location: {loc or 'N/A'} | Rider: {rider or 'N/A'}", size=12, color=ft.Colors.GREY_700),
-                            ft.Row([
-                                ft.Text(f"₦{total:,.2f}", weight=ft.FontWeight.BOLD, color=ft.Colors.GREEN_800),
-                                ft.IconButton(
-                                    icon=ft.Icons.DELETE_OUTLINED, 
-                                    icon_color=ft.Colors.RED_400,
-                                    on_click=lambda e, r_id=pkg_id: delete_record(r_id)
-                                )
-                            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
-                        ])
-                    )
-                )
-                history_list.controls.append(card)
         page.update()
 
     load_database_records()
 
-    # Screen View Container
     body = ft.Container(content=form_view, padding=12, expand=True)
 
-    # Bottom Navigation Handler
     def on_nav_change(e):
         idx = int(e.control.selected_index)
         if idx == 0:
