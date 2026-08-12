@@ -32,10 +32,11 @@ jobs:
         with:
           flutter-version: '3.22.0'
 
-      - name: Accept Android Licenses
+      - name: Auto-Accept Android SDK Licenses
         run: |
-          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
-          flutter doctor --android-licenses || true
+          mkdir -p ~/.android
+          touch ~/.android/repositories.cfg
+          yes | flutter doctor --android-licenses || true
 
       - name: Build APK via Flet
         run: flet build apk --yes
