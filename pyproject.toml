@@ -1,0 +1,16 @@
+[project]
+name = "KenooffLogisticApp"
+version = "0.1.0"
+description = "Kenooff Logistics Management App"
+dependencies = [
+    "flet",
+    "supabase",
+    "postgrest",
+    "gotrue",
+    "realtime",
+    "storage3",
+    "httpx"
+]
+
+[tool.flet]
+main = "main.py"
