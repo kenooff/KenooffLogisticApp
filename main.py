@@ -5,7 +5,7 @@ import urllib.parse
 import time
 
 # ==================== SUPABASE CONFIG ====================
-SUPABASE_URL = "https://supabase.com/dashboard/project/nkllvhzebktydnqvjuoc"  # Replace with your URL
+SUPABASE_URL = "https://nkllvhzebktydnqvjuoc.supabase.com"  # Replace with your URL
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5rbGx2aHplYmt0eWRucXZqdW9jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYyODQzNDMsImV4cCI6MjEwMTg2MDM0M30.zIPGzDv5krWPUaIJzTP2BnKhSxU5LjJ0DraR46zFFLI"                   # Replace with your Anon Key
 
 # Direct HTTP Helper for Supabase REST API
