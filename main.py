@@ -9,10 +9,7 @@ SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 # Initialize Supabase Client
 try:
     supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-    use_cloud = True
-except Exception as e:
-    use_cloud = False
-
+    
 def main(page: ft.Page):
     page.title = "Kenooff Logistics"
     page.theme_mode = ft.ThemeMode.LIGHT
