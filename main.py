@@ -1,15 +1,30 @@
 import flet as ft
-from supabase import create_client, Client
+import json
+import urllib.request
+import urllib.parse
 import time
 
-# ==================== SUPABASE CLOUD CONFIG ====================
-SUPABASE_URL = "nkllvhzebktydnqvjuoc"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5rbGx2aHplYmt0eWRucXZqdW9jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYyODQzNDMsImV4cCI6MjEwMTg2MDM0M30.zIPGzDv5krWPUaIJzTP2BnKhSxU5LjJ0DraR46zFFLI" 
+# ==================== SUPABASE CONFIG ====================
+SUPABASE_URL = "https://supabase.com/dashboard/project/nkllvhzebktydnqvjuoc"  # Replace with your URL
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5rbGx2aHplYmt0eWRucXZqdW9jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYyODQzNDMsImV4cCI6MjEwMTg2MDM0M30.zIPGzDv5krWPUaIJzTP2BnKhSxU5LjJ0DraR46zFFLI"                   # Replace with your Anon Key
 
-# Initialize Supabase Client
-try:
-    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+# Direct HTTP Helper for Supabase REST API
+def supabase_request(endpoint: str, method: str = "GET", data: dict = None):
+    url = f"{SUPABASE_URL}/rest/v1/{endpoint}"
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json",
+        "Prefer": "return=representation"
+    }
     
+    body = json.dumps(data).encode("utf-8") if data else None
+    req = urllib.request.Request(url, data=body, headers=headers, method=method)
+    
+    with urllib.request.urlopen(req) as response:
+        res_data = response.read().decode("utf-8")
+        return json.loads(res_data) if res_data else []
+
 def main(page: ft.Page):
     page.title = "Kenooff Logistics"
     page.theme_mode = ft.ThemeMode.LIGHT
@@ -17,7 +32,6 @@ def main(page: ft.Page):
 
     time.sleep(0.3)
 
-    # Toast/Snackbar Alert Helper
     def show_alert(message: str, bg_color):
         snack = ft.SnackBar(
             content=ft.Text(message, color=ft.Colors.WHITE),
@@ -27,7 +41,7 @@ def main(page: ft.Page):
         page.overlay.append(snack)
         page.update()
 
-    # ==================== FORM INPUT CONTROLS ====================
+    # ==================== FORM CONTROLS ====================
     vendor_input = ft.TextField(label="Vendor Name", border_radius=8)
     package_input = ft.TextField(label="Package Description", border_radius=8)
     qty_input = ft.TextField(label="Quantity", value="1", keyboard_type=ft.KeyboardType.NUMBER, border_radius=8)
@@ -76,7 +90,6 @@ def main(page: ft.Page):
         style=ft.ButtonStyle(color=ft.Colors.GREEN_700)
     )
 
-    # SAVE TO CLOUD HANDLER
     def handle_submit(e):
         if not vendor_input.value or not package_input.value:
             show_alert("Please fill in Vendor Name and Package Description!", ft.Colors.RED_600)
@@ -101,10 +114,8 @@ def main(page: ft.Page):
                 "status": initial_status.value
             }
 
-            # Insert into Supabase Online Database
-            supabase.table("packages").insert(data).execute()
+            supabase_request("packages", method="POST", data=data)
 
-            # Clear inputs
             vendor_input.value = ""
             package_input.value = ""
             qty_input.value = "1"
@@ -128,12 +139,11 @@ def main(page: ft.Page):
         style=ft.ButtonStyle(bgcolor=ft.Colors.BLUE_800)
     )
 
-    # Form Layout View
     form_view = ft.ListView(
         spacing=14,
         controls=[
             ft.Text("Kenooff Logistics Form", size=22, weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_800),
-            ft.Text("Log New Package Entry (Online Cloud)", size=14, color=ft.Colors.GREY_600),
+            ft.Text("Log New Package Entry (Cloud Connected)", size=14, color=ft.Colors.GREY_600),
             ft.Divider(height=10),
             vendor_input,
             package_input,
@@ -153,33 +163,29 @@ def main(page: ft.Page):
         ]
     )
 
-    # ==================== DATA HISTORY & UPDATE VIEW ====================
+    # ==================== DATA HISTORY & UPDATE ====================
     history_list = ft.ListView(spacing=10, expand=True)
 
-    # DELETE RECORD FROM CLOUD
     def delete_record(record_id):
         try:
-            supabase.table("packages").delete().eq("id", record_id).execute()
+            supabase_request(f"packages?id=eq.{record_id}", method="DELETE")
             show_alert("Record deleted from Cloud!", ft.Colors.GREY_700)
             load_database_records()
         except Exception as ex:
             show_alert(f"Failed to delete: {str(ex)}", ft.Colors.RED_600)
 
-    # UPDATE PACKAGE STATUS IN CLOUD
     def update_status(record_id, new_status):
         try:
-            supabase.table("packages").update({"status": new_status}).eq("id", record_id).execute()
+            supabase_request(f"packages?id=eq.{record_id}", method="PATCH", data={"status": new_status})
             show_alert(f"Status updated to '{new_status}'!", ft.Colors.GREEN_700)
             load_database_records()
         except Exception as ex:
             show_alert(f"Failed to update status: {str(ex)}", ft.Colors.RED_600)
 
-    # FETCH RECORDS FROM CLOUD
     def load_database_records():
         history_list.controls.clear()
         try:
-            response = supabase.table("packages").select("*").order("id", desc=True).execute()
-            rows = response.data
+            rows = supabase_request("packages?select=*&order=id.desc", method="GET")
 
             if not rows:
                 history_list.controls.append(
@@ -205,7 +211,6 @@ def main(page: ft.Page):
                     elif status == "In Transit":
                         status_color = ft.Colors.BLUE_700
 
-                    # Dynamic Status Change Dropdown Menu
                     status_dropdown = ft.Dropdown(
                         value=status,
                         width=140,
