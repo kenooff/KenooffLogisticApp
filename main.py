@@ -179,6 +179,7 @@ def main(page: ft.Page):
             supabase_request(f"packages?id=eq.{record_id}", method="PATCH", data={"status": new_status})
             show_alert(f"Status updated to '{new_status}'!", ft.Colors.GREEN_700)
             load_database_records()
+            page.update()         
         except Exception as ex:
             show_alert(f"Failed to update status: {str(ex)}", ft.Colors.RED_600)
 
