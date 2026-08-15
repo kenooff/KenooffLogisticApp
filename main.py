@@ -6,7 +6,7 @@ import time
 
 # ==================== SUPABASE CONFIG ====================
 SUPABASE_URL = "https://nkllvhzebktydnqvjuoc.supabase.co"
-SUPABASE_KEY = "YOUR_ACTUAL_ANON_KEY_HERE" # Keep your eyJ... key here!
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5rbGx2aHplYmt0eWRucXZqdW9jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYyODQzNDMsImV4cCI6MjEwMTg2MDM0M30.zIPGzDv5krWPUaIJzTP2BnKhSxU5LjJ0DraR46zFFLI" # Keep your eyJ... key here!
 
 # Direct HTTP Helper for Supabase REST API
 def supabase_request(endpoint: str, method: str = "GET", data: dict = None):
