@@ -6,7 +6,7 @@ import time
 
 # ==================== SUPABASE CONFIG ====================
 SUPABASE_URL = "https://nkllvhzebktydnqvjuoc.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5rbGx2aHplYmt0eWRucXZqdW9jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYyODQzNDMsImV4cCI6MjEwMTg2MDM0M30.zIPGzDv5krWPUaIJzTP2BnKhSxU5LjJ0DraR46zFFLI" # Keep your eyJ... key here!
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5rbGx2aHplYmt0eWRucXZqdW9jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYyODQzNDMsImV4cCI6MjEwMTg2MDM0M30.zIPGzDv5krWPUaIJzTP2BnKhSxU5LjJ0DraR46zFFLI"  # Keep your eyJ... key here!
 
 # Direct HTTP Helper for Supabase REST API
 def supabase_request(endpoint: str, method: str = "GET", data: dict = None):
@@ -90,10 +90,31 @@ def main(page: ft.Page):
         style=ft.ButtonStyle(color=ft.Colors.GREEN_700)
     )
 
+    # SUBMIT BUTTON + LOADING SPINNER
+    submit_btn_content = ft.Row(
+        [ft.Text("Log & Save Package", color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD)],
+        alignment=ft.MainAxisAlignment.CENTER
+    )
+    
+    submit_btn = ft.ElevatedButton(
+        content=submit_btn_content,
+        height=50,
+        expand=True,
+        style=ft.ButtonStyle(bgcolor=ft.Colors.BLUE_800)
+    )
+
     def handle_submit(e):
         if not vendor_input.value or not package_input.value:
             show_alert("Please fill in Vendor Name and Package Description!", ft.Colors.RED_600)
             return
+
+        # Show Loading Spinner & Disable Button
+        submit_btn.disabled = True
+        submit_btn_content.controls = [
+            ft.ProgressRing(width=20, height=20, stroke_width=2, color=ft.Colors.WHITE),
+            ft.Text(" Saving to Cloud...", color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD)
+        ]
+        page.update()
 
         try:
             qty = float(qty_input.value) if qty_input.value else 0.0
@@ -116,6 +137,7 @@ def main(page: ft.Page):
 
             supabase_request("packages", method="POST", data=data)
 
+            # Reset Inputs
             vendor_input.value = ""
             package_input.value = ""
             qty_input.value = "1"
@@ -126,18 +148,19 @@ def main(page: ft.Page):
             total_badge.value = "Total Value: ₦0.00"
 
             show_alert("Package Saved Online Successfully!", ft.Colors.GREEN_600)
-            load_database_records()
 
         except Exception as ex:
             show_alert(f"Error saving to Cloud: {str(ex)}", ft.Colors.RED_600)
 
-    submit_btn = ft.ElevatedButton(
-        content=ft.Text("Log & Save Package", color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD),
-        on_click=handle_submit,
-        height=50,
-        expand=True,
-        style=ft.ButtonStyle(bgcolor=ft.Colors.BLUE_800)
-    )
+        finally:
+            # Restore Button State
+            submit_btn.disabled = False
+            submit_btn_content.controls = [
+                ft.Text("Log & Save Package", color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD)
+            ]
+            page.update()
+
+    submit_btn.on_click = handle_submit
 
     form_view = ft.ListView(
         spacing=14,
@@ -176,10 +199,10 @@ def main(page: ft.Page):
 
     def update_status(record_id, new_status):
         try:
-            supabase_request(f"packages?id=eq.{record_id}", method="PATCH", data={"status": new_status})
+            # Update status in Supabase DB using explicit record ID
+            supabase_request(f"packages?id=eq.{int(record_id)}", method="PATCH", data={"status": str(new_status)})
             show_alert(f"Status updated to '{new_status}'!", ft.Colors.GREEN_700)
             load_database_records()
-            page.update()         
         except Exception as ex:
             show_alert(f"Failed to update status: {str(ex)}", ft.Colors.RED_600)
 
@@ -204,7 +227,7 @@ def main(page: ft.Page):
                     total = row.get("total_value", 0.0) or 0.0
                     loc = row.get("location", "")
                     rider = row.get("rider", "")
-                    status = row.get("status", "Pending")
+                    status = str(row.get("status", "Pending"))
 
                     status_color = ft.Colors.ORANGE_700
                     if status == "Delivered":
@@ -212,7 +235,7 @@ def main(page: ft.Page):
                     elif status == "In Transit":
                         status_color = ft.Colors.BLUE_700
 
-                    # Fixed Dropdown initialization
+                    # Create Dropdown for Status Change
                     status_dropdown = ft.Dropdown(
                         value=status,
                         width=140,
@@ -265,8 +288,6 @@ def main(page: ft.Page):
                 )
             )
         page.update()
-
-    load_database_records()
 
     body = ft.Container(content=form_view, padding=12, expand=True)
 
