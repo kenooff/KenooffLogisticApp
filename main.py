@@ -15,15 +15,21 @@ def supabase_request(endpoint: str, method: str = "GET", data: dict = None):
         "apikey": SUPABASE_KEY,
         "Authorization": f"Bearer {SUPABASE_KEY}",
         "Content-Type": "application/json",
-        "Prefer": "return=representation"
+        "Prefer": "return=representation"  # Returns modified row
     }
     
     body = json.dumps(data).encode("utf-8") if data is not None else None
     req = urllib.request.Request(url, data=body, headers=headers, method=method)
     
-    with urllib.request.urlopen(req) as response:
-        res_data = response.read().decode("utf-8")
-        return json.loads(res_data) if res_data else []
+    try:
+        with urllib.request.urlopen(req) as response:
+            res_data = response.read().decode("utf-8")
+            return json.loads(res_data) if res_data else []
+    except urllib.error.HTTPError as e:
+        error_body = e.read().decode("utf-8")
+        raise Exception(f"HTTP {e.code}: {error_body}")
+    except Exception as e:
+        raise Exception(str(e))
 
 def main(page: ft.Page):
     page.title = "Kenooff Logistics"
@@ -196,20 +202,20 @@ def main(page: ft.Page):
 
     def update_status(record_id, new_status):
         try:
-            # Send PATCH to Supabase
+            # Explicitly format as string query parameter
             res = supabase_request(f"packages?id=eq.{record_id}", method="PATCH", data={"status": str(new_status)})
             
-            # Check if any row was returned/updated
-            if not res:
-                show_alert(f"Warning: Record ID {record_id} not found in DB.", ft.Colors.ORANGE_700)
+            # Check if Supabase actually modified a row
+            if not res or len(res) == 0:
+                show_alert(f"Failed: No record with ID={record_id} found to update.", ft.Colors.RED_600)
             else:
                 show_alert(f"Status updated to '{new_status}'!", ft.Colors.GREEN_700)
             
-            # Reload DB rows & force full UI refresh
+            # Reload and force interface rebuild
             load_database_records()
             page.update()
         except Exception as ex:
-            show_alert(f"Failed to update status: {str(ex)}", ft.Colors.RED_600)
+            show_alert(f"Error: {str(ex)}", ft.Colors.RED_600)
 
     def make_status_handler(target_id):
         return lambda e: update_status(target_id, e.control.value)
