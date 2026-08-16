@@ -1,3 +1,4 @@
+
 import flet as ft
 import json
 import urllib.request
@@ -6,7 +7,7 @@ import time
 
 # ==================== SUPABASE CONFIG ====================
 SUPABASE_URL = "https://nkllvhzebktydnqvjuoc.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5rbGx2aHplYmt0eWRucXZqdW9jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYyODQzNDMsImV4cCI6MjEwMTg2MDM0M30.zIPGzDv5krWPUaIJzTP2BnKhSxU5LjJ0DraR46zFFLI"  # Keep your eyJ... key here!
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5rbGx2aHplYmt0eWRucXZqdW9jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYyODQzNDMsImV4cCI6MjEwMTg2MDM0M30.zIPGzDv5krWPUaIJzTP2BnKhSxU5LjJ0DraR46zFFLI"  # Keep your real eyJ... key here!
 
 # Direct HTTP Helper for Supabase REST API
 def supabase_request(endpoint: str, method: str = "GET", data: dict = None):
@@ -90,7 +91,6 @@ def main(page: ft.Page):
         style=ft.ButtonStyle(color=ft.Colors.GREEN_700)
     )
 
-    # SUBMIT BUTTON + LOADING SPINNER
     submit_btn_content = ft.Row(
         [ft.Text("Log & Save Package", color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD)],
         alignment=ft.MainAxisAlignment.CENTER
@@ -108,7 +108,6 @@ def main(page: ft.Page):
             show_alert("Please fill in Vendor Name and Package Description!", ft.Colors.RED_600)
             return
 
-        # Show Loading Spinner & Disable Button
         submit_btn.disabled = True
         submit_btn_content.controls = [
             ft.ProgressRing(width=20, height=20, stroke_width=2, color=ft.Colors.WHITE),
@@ -137,7 +136,6 @@ def main(page: ft.Page):
 
             supabase_request("packages", method="POST", data=data)
 
-            # Reset Inputs
             vendor_input.value = ""
             package_input.value = ""
             qty_input.value = "1"
@@ -153,7 +151,6 @@ def main(page: ft.Page):
             show_alert(f"Error saving to Cloud: {str(ex)}", ft.Colors.RED_600)
 
         finally:
-            # Restore Button State
             submit_btn.disabled = False
             submit_btn_content.controls = [
                 ft.Text("Log & Save Package", color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD)
@@ -199,12 +196,18 @@ def main(page: ft.Page):
 
     def update_status(record_id, new_status):
         try:
-            # Update status in Supabase DB using explicit record ID
-            supabase_request(f"packages?id=eq.{int(record_id)}", method="PATCH", data={"status": str(new_status)})
+            supabase_request(f"packages?id=eq.{record_id}", method="PATCH", data={"status": str(new_status)})
             show_alert(f"Status updated to '{new_status}'!", ft.Colors.GREEN_700)
             load_database_records()
         except Exception as ex:
             show_alert(f"Failed to update status: {str(ex)}", ft.Colors.RED_600)
+
+    # Helper function that locks the target record_id inside its scope
+    def make_status_handler(target_id):
+        return lambda e: update_status(target_id, e.control.value)
+
+    def make_delete_handler(target_id):
+        return lambda e: delete_record(target_id)
 
     def load_database_records():
         history_list.controls.clear()
@@ -221,7 +224,7 @@ def main(page: ft.Page):
                 )
             else:
                 for row in rows:
-                    pkg_id = row.get("id")
+                    current_id = row.get("id")
                     vendor = row.get("vendor", "")
                     desc = row.get("package_desc", "")
                     total = row.get("total_value", 0.0) or 0.0
@@ -235,7 +238,7 @@ def main(page: ft.Page):
                     elif status == "In Transit":
                         status_color = ft.Colors.BLUE_700
 
-                    # Create Dropdown for Status Change
+                    # Status Dropdown with bound handler
                     status_dropdown = ft.Dropdown(
                         value=status,
                         width=140,
@@ -246,9 +249,9 @@ def main(page: ft.Page):
                             ft.dropdown.Option("Pending"),
                             ft.dropdown.Option("In Transit"),
                             ft.dropdown.Option("Delivered"),
-                        ]
+                        ],
+                        on_change=make_status_handler(current_id)
                     )
-                    status_dropdown.on_change = lambda e, r_id=pkg_id: update_status(r_id, e.control.value)
 
                     card = ft.Card(
                         content=ft.Container(
@@ -272,7 +275,7 @@ def main(page: ft.Page):
                                         ft.IconButton(
                                             icon=ft.Icons.DELETE_OUTLINED, 
                                             icon_color=ft.Colors.RED_400,
-                                            on_click=lambda e, r_id=pkg_id: delete_record(r_id)
+                                            on_click=make_delete_handler(current_id)
                                         )
                                     ])
                                 ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
