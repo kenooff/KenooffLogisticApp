@@ -18,7 +18,7 @@ def supabase_request(endpoint: str, method: str = "GET", data: dict = None):
         "Prefer": "return=representation"
     }
     
-    body = json.dumps(data).encode("utf-8") if data else None
+    body = json.dumps(data).encode("utf-8") if data is not None else None
     req = urllib.request.Request(url, data=body, headers=headers, method=method)
     
     with urllib.request.urlopen(req) as response:
@@ -190,14 +190,24 @@ def main(page: ft.Page):
             supabase_request(f"packages?id=eq.{record_id}", method="DELETE")
             show_alert("Record deleted from Cloud!", ft.Colors.GREY_700)
             load_database_records()
+            page.update()
         except Exception as ex:
             show_alert(f"Failed to delete: {str(ex)}", ft.Colors.RED_600)
 
     def update_status(record_id, new_status):
         try:
-            supabase_request(f"packages?id=eq.{record_id}", method="PATCH", data={"status": str(new_status)})
-            show_alert(f"Status updated to '{new_status}'!", ft.Colors.GREEN_700)
+            # Send PATCH to Supabase
+            res = supabase_request(f"packages?id=eq.{record_id}", method="PATCH", data={"status": str(new_status)})
+            
+            # Check if any row was returned/updated
+            if not res:
+                show_alert(f"Warning: Record ID {record_id} not found in DB.", ft.Colors.ORANGE_700)
+            else:
+                show_alert(f"Status updated to '{new_status}'!", ft.Colors.GREEN_700)
+            
+            # Reload DB rows & force full UI refresh
             load_database_records()
+            page.update()
         except Exception as ex:
             show_alert(f"Failed to update status: {str(ex)}", ft.Colors.RED_600)
 
@@ -236,7 +246,6 @@ def main(page: ft.Page):
                     elif status == "In Transit":
                         status_color = ft.Colors.BLUE_700
 
-                    # Fixed Dropdown syntax
                     status_dropdown = ft.Dropdown(
                         value=status,
                         width=140,
@@ -288,7 +297,6 @@ def main(page: ft.Page):
                     padding=20
                 )
             )
-        page.update()
 
     body = ft.Container(content=form_view, padding=12, expand=True)
 
