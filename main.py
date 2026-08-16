@@ -1,4 +1,3 @@
-
 import flet as ft
 import json
 import urllib.request
@@ -202,7 +201,6 @@ def main(page: ft.Page):
         except Exception as ex:
             show_alert(f"Failed to update status: {str(ex)}", ft.Colors.RED_600)
 
-    # Helper function that locks the target record_id inside its scope
     def make_status_handler(target_id):
         return lambda e: update_status(target_id, e.control.value)
 
@@ -238,7 +236,7 @@ def main(page: ft.Page):
                     elif status == "In Transit":
                         status_color = ft.Colors.BLUE_700
 
-                    # Status Dropdown with bound handler
+                    # Fixed Dropdown syntax
                     status_dropdown = ft.Dropdown(
                         value=status,
                         width=140,
@@ -249,9 +247,9 @@ def main(page: ft.Page):
                             ft.dropdown.Option("Pending"),
                             ft.dropdown.Option("In Transit"),
                             ft.dropdown.Option("Delivered"),
-                        ],
-                        on_change=make_status_handler(current_id)
+                        ]
                     )
+                    status_dropdown.on_change = make_status_handler(current_id)
 
                     card = ft.Card(
                         content=ft.Container(
