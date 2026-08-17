@@ -6,7 +6,7 @@ import time
 
 # ==================== SUPABASE CONFIG ====================
 SUPABASE_URL = "https://nkllvhzebktydnqvjuoc.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5rbGx2aHplYmt0eWRucXZqdW9jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYyODQzNDMsImV4cCI6MjEwMTg2MDM0M30.zIPGzDv5krWPUaIJzTP2BnKhSxU5LjJ0DraR46zFFLI"  # Keep your real eyJ... key here!
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5rbGx2aHplYmt0eWRucXZqdW9jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYyODQzNDMsImV4cCI6MjEwMTg2MDM0M30.zIPGzDv5krWPUaIJzTP2BnKhSxU5LjJ0DraR46zFFLI"
 
 # Direct HTTP Helper for Supabase REST API
 def supabase_request(endpoint: str, method: str = "GET", data: dict = None):
@@ -15,7 +15,7 @@ def supabase_request(endpoint: str, method: str = "GET", data: dict = None):
         "apikey": SUPABASE_KEY,
         "Authorization": f"Bearer {SUPABASE_KEY}",
         "Content-Type": "application/json",
-        "Prefer": "return=representation"  # Returns modified row
+        "Prefer": "return=representation"
     }
     
     body = json.dumps(data).encode("utf-8") if data is not None else None
@@ -195,30 +195,34 @@ def main(page: ft.Page):
         try:
             supabase_request(f"packages?id=eq.{record_id}", method="DELETE")
             show_alert("Record deleted from Cloud!", ft.Colors.GREY_700)
+            time.sleep(0.3)
             load_database_records()
             page.update()
         except Exception as ex:
             show_alert(f"Failed to delete: {str(ex)}", ft.Colors.RED_600)
 
-    def update_status(record_id, new_status):
+    def update_status(record_id, new_status, badge_container, badge_text):
         try:
-            # Explicitly format as string query parameter
-            res = supabase_request(f"packages?id=eq.{record_id}", method="PATCH", data={"status": str(new_status)})
-            
-            # Check if Supabase actually modified a row
-            if not res or len(res) == 0:
-                show_alert(f"Failed: No record with ID={record_id} found to update.", ft.Colors.RED_600)
+            # 1. Immediate local UI update for instant feedback
+            badge_text.value = f" {new_status} "
+            if new_status == "Delivered":
+                badge_container.bgcolor = ft.Colors.GREEN_700
+            elif new_status == "In Transit":
+                badge_container.bgcolor = ft.Colors.BLUE_700
             else:
-                show_alert(f"Status updated to '{new_status}'!", ft.Colors.GREEN_700)
+                badge_container.bgcolor = ft.Colors.ORANGE_700
+            page.update()
+
+            # 2. Update Cloud DB
+            supabase_request(f"packages?id=eq.{record_id}", method="PATCH", data={"status": str(new_status)})
+            show_alert(f"Status updated to '{new_status}'!", ft.Colors.GREEN_700)
             
-            # Reload and force interface rebuild
+            # 3. Small sleep to ensure Supabase finishes writing before we re-fetch
+            time.sleep(0.4)
             load_database_records()
             page.update()
         except Exception as ex:
             show_alert(f"Error: {str(ex)}", ft.Colors.RED_600)
-
-    def make_status_handler(target_id):
-        return lambda e: update_status(target_id, e.control.value)
 
     def make_delete_handler(target_id):
         return lambda e: delete_record(target_id)
@@ -252,6 +256,14 @@ def main(page: ft.Page):
                     elif status == "In Transit":
                         status_color = ft.Colors.BLUE_700
 
+                    badge_txt = ft.Text(f" {status} ", color=ft.Colors.WHITE, size=12)
+                    badge_cnt = ft.Container(
+                        content=badge_txt,
+                        bgcolor=status_color,
+                        border_radius=4,
+                        padding=4
+                    )
+
                     status_dropdown = ft.Dropdown(
                         value=status,
                         width=140,
@@ -264,7 +276,12 @@ def main(page: ft.Page):
                             ft.dropdown.Option("Delivered"),
                         ]
                     )
-                    status_dropdown.on_change = make_status_handler(current_id)
+
+                    # Pass control references into the event handler
+                    def make_status_handler(target_id, b_cnt, b_txt):
+                        return lambda e: update_status(target_id, e.control.value, b_cnt, b_txt)
+
+                    status_dropdown.on_change = make_status_handler(current_id, badge_cnt, badge_txt)
 
                     card = ft.Card(
                         content=ft.Container(
@@ -272,12 +289,7 @@ def main(page: ft.Page):
                             content=ft.Column([
                                 ft.Row([
                                     ft.Text(f"{vendor}", weight=ft.FontWeight.BOLD, size=16),
-                                    ft.Container(
-                                        content=ft.Text(f" {status} ", color=ft.Colors.WHITE, size=12),
-                                        bgcolor=status_color,
-                                        border_radius=4,
-                                        padding=4
-                                    )
+                                    badge_cnt
                                 ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
                                 ft.Text(f"Item: {desc}", size=14),
                                 ft.Text(f"Location: {loc or 'N/A'} | Rider: {rider or 'N/A'}", size=12, color=ft.Colors.GREY_700),
