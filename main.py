@@ -200,34 +200,30 @@ def main(page: ft.Page):
             page.update()
         except Exception as ex:
             show_alert(f"Failed to delete: {str(ex)}", ft.Colors.RED_600)
-
+            
     def update_status(record_id, new_status, badge_container, badge_text):
         try:
-            # Update database via PATCH endpoint
-            updated_rows = supabase_request(
-                f"packages?id=eq.{record_id}", 
-                method="PATCH", 
-                data={"status": str(new_status)}
+            # Send RPC call directly to database function
+            supabase_request(
+                "rpc/update_package_status", 
+                method="POST", 
+                data={"row_id": int(record_id), "new_status": str(new_status)}
             )
             
-            if not updated_rows or len(updated_rows) == 0:
-                show_alert(f"DB Warning: Row ID {record_id} not updated. Check Supabase RLS policies.", ft.Colors.RED_600)
+            # Immediately update screen badge
+            badge_text.value = f" {new_status} "
+            if new_status == "Delivered":
+                badge_container.bgcolor = ft.Colors.GREEN_700
+            elif new_status == "In Transit":
+                badge_container.bgcolor = ft.Colors.BLUE_700
             else:
-                # Update UI badge on successful confirmation
-                badge_text.value = f" {new_status} "
-                if new_status == "Delivered":
-                    badge_container.bgcolor = ft.Colors.GREEN_700
-                elif new_status == "In Transit":
-                    badge_container.bgcolor = ft.Colors.BLUE_700
-                else:
-                    badge_container.bgcolor = ft.Colors.ORANGE_700
-                
-                show_alert(f"Status updated to '{new_status}'!", ft.Colors.GREEN_700)
+                badge_container.bgcolor = ft.Colors.ORANGE_700
             
+            show_alert(f"Status updated to '{new_status}'!", ft.Colors.GREEN_700)
             page.update()
+
         except Exception as ex:
             show_alert(f"Error updating status: {str(ex)}", ft.Colors.RED_600)
-
     def make_delete_handler(target_id):
         return lambda e: delete_record(target_id)
 
