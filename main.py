@@ -26,8 +26,8 @@ def supabase_request(endpoint: str, method: str = "GET", data: dict = None):
             res_data = response.read().decode("utf-8")
             return json.loads(res_data) if res_data else []
     except urllib.error.HTTPError as e:
-        error_body = e.read().decode("utf-8")
-        raise Exception(f"HTTP {e.code}: {error_body}")
+        err_msg = e.read().decode("utf-8")
+        raise Exception(f"HTTP {e.code}: {err_msg}")
     except Exception as e:
         raise Exception(str(e))
 
@@ -203,26 +203,30 @@ def main(page: ft.Page):
 
     def update_status(record_id, new_status, badge_container, badge_text):
         try:
-            # 1. Immediate local UI update for instant feedback
-            badge_text.value = f" {new_status} "
-            if new_status == "Delivered":
-                badge_container.bgcolor = ft.Colors.GREEN_700
-            elif new_status == "In Transit":
-                badge_container.bgcolor = ft.Colors.BLUE_700
-            else:
-                badge_container.bgcolor = ft.Colors.ORANGE_700
-            page.update()
-
-            # 2. Update Cloud DB
-            supabase_request(f"packages?id=eq.{record_id}", method="PATCH", data={"status": str(new_status)})
-            show_alert(f"Status updated to '{new_status}'!", ft.Colors.GREEN_700)
+            # Update database via PATCH endpoint
+            updated_rows = supabase_request(
+                f"packages?id=eq.{record_id}", 
+                method="PATCH", 
+                data={"status": str(new_status)}
+            )
             
-            # 3. Small sleep to ensure Supabase finishes writing before we re-fetch
-            time.sleep(0.4)
-            load_database_records()
+            if not updated_rows or len(updated_rows) == 0:
+                show_alert(f"DB Warning: Row ID {record_id} not updated. Check Supabase RLS policies.", ft.Colors.RED_600)
+            else:
+                # Update UI badge on successful confirmation
+                badge_text.value = f" {new_status} "
+                if new_status == "Delivered":
+                    badge_container.bgcolor = ft.Colors.GREEN_700
+                elif new_status == "In Transit":
+                    badge_container.bgcolor = ft.Colors.BLUE_700
+                else:
+                    badge_container.bgcolor = ft.Colors.ORANGE_700
+                
+                show_alert(f"Status updated to '{new_status}'!", ft.Colors.GREEN_700)
+            
             page.update()
         except Exception as ex:
-            show_alert(f"Error: {str(ex)}", ft.Colors.RED_600)
+            show_alert(f"Error updating status: {str(ex)}", ft.Colors.RED_600)
 
     def make_delete_handler(target_id):
         return lambda e: delete_record(target_id)
@@ -277,7 +281,6 @@ def main(page: ft.Page):
                         ]
                     )
 
-                    # Pass control references into the event handler
                     def make_status_handler(target_id, b_cnt, b_txt):
                         return lambda e: update_status(target_id, e.control.value, b_cnt, b_txt)
 
