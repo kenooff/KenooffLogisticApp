@@ -200,92 +200,6 @@ def main(page: ft.Page):
         except Exception as ex:
             show_alert(f"Failed to delete: {str(ex)}", ft.Colors.RED_600)
 
-    # Individual Card Builder Function
-    def build_package_card(row):
-        pkg_id = row.get("id")
-        vendor = row.get("vendor", "")
-        desc = row.get("package_desc", "")
-        total = row.get("total_value", 0.0) or 0.0
-        loc = row.get("location", "")
-        rider = row.get("rider", "")
-        status = str(row.get("status", "Pending"))
-
-        status_color = ft.Colors.ORANGE_700
-        if status == "Delivered":
-            status_color = ft.Colors.GREEN_700
-        elif status == "In Transit":
-            status_color = ft.Colors.BLUE_700
-
-        badge_txt = ft.Text(f" {status} ", color=ft.Colors.WHITE, size=12)
-        badge_cnt = ft.Container(
-            content=badge_txt,
-            bgcolor=status_color,
-            border_radius=4,
-            padding=4
-        )
-
-        status_dropdown = ft.Dropdown(
-            value=status,
-            width=140,
-            height=40,
-            text_size=12,
-            border_radius=6,
-            options=[
-                ft.dropdown.Option("Pending"),
-                ft.dropdown.Option("In Transit"),
-                ft.dropdown.Option("Delivered"),
-            ]
-        )
-
-        # Isolated Event Handler
-        def on_status_change(e):
-            new_val = status_dropdown.value
-            
-            # 1. Update UI colors immediately
-            badge_txt.value = f" {new_val} "
-            if new_val == "Delivered":
-                badge_cnt.bgcolor = ft.Colors.GREEN_700
-            elif new_val == "In Transit":
-                badge_cnt.bgcolor = ft.Colors.BLUE_700
-            else:
-                badge_cnt.bgcolor = ft.Colors.ORANGE_700
-            
-            page.update()
-
-            # 2. Sync to Cloud
-            try:
-                supabase_request(f"packages?id=eq.{pkg_id}", method="PATCH", data={"status": str(new_val)})
-                show_alert(f"Status changed to '{new_val}'", ft.Colors.GREEN_700)
-            except Exception as ex:
-                show_alert(f"Failed to update cloud: {str(ex)}", ft.Colors.RED_600)
-
-        status_dropdown.on_change = on_status_change
-
-        return ft.Card(
-            content=ft.Container(
-                padding=12,
-                content=ft.Column([
-                    ft.Row([
-                        ft.Text(f"{vendor}", weight=ft.FontWeight.BOLD, size=16),
-                        badge_cnt
-                    ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-                    ft.Text(f"Item: {desc}", size=14),
-                    ft.Text(f"Location: {loc or 'N/A'} | Rider: {rider or 'N/A'}", size=12, color=ft.Colors.GREY_700),
-                    ft.Row([
-                        ft.Text(f"₦{total:,.2f}", weight=ft.FontWeight.BOLD, color=ft.Colors.GREEN_800),
-                        ft.Row([
-                            status_dropdown,
-                            ft.IconButton(
-                                icon=ft.Icons.DELETE_OUTLINED, 
-                                icon_color=ft.Colors.RED_400,
-                                on_click=lambda e: delete_record(pkg_id)
-                            )
-                        ])
-                    ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
-                ])
-            )
-        )
-
     def load_database_records():
         history_list.controls.clear()
         try:
@@ -301,7 +215,95 @@ def main(page: ft.Page):
                 )
             else:
                 for row in rows:
-                    card = build_package_card(row)
+                    pkg_id = row.get("id")
+                    vendor = row.get("vendor", "")
+                    desc = row.get("package_desc", "")
+                    total = row.get("total_value", 0.0) or 0.0
+                    loc = row.get("location", "")
+                    rider = row.get("rider", "")
+                    current_status = str(row.get("status", "Pending"))
+
+                    status_color = ft.Colors.ORANGE_700
+                    if current_status == "Delivered":
+                        status_color = ft.Colors.GREEN_700
+                    elif current_status == "In Transit":
+                        status_color = ft.Colors.BLUE_700
+
+                    badge_txt = ft.Text(f" {current_status} ", color=ft.Colors.WHITE, size=12)
+                    badge_cnt = ft.Container(
+                        content=badge_txt,
+                        bgcolor=status_color,
+                        border_radius=4,
+                        padding=4
+                    )
+
+                    status_dropdown = ft.Dropdown(
+                        value=current_status,
+                        width=140,
+                        height=40,
+                        text_size=12,
+                        border_radius=6,
+                        options=[
+                            ft.dropdown.Option("Pending"),
+                            ft.dropdown.Option("In Transit"),
+                            ft.dropdown.Option("Delivered"),
+                        ]
+                    )
+
+                    # Explicit closure for status change
+                    def create_change_handler(target_id, d_control, b_cnt, b_txt):
+                        def on_change(e):
+                            selected_val = d_control.value
+                            
+                            # 1. Update UI locally right away
+                            b_txt.value = f" {selected_val} "
+                            if selected_val == "Delivered":
+                                b_cnt.bgcolor = ft.Colors.GREEN_700
+                            elif selected_val == "In Transit":
+                                b_cnt.bgcolor = ft.Colors.BLUE_700
+                            else:
+                                b_cnt.bgcolor = ft.Colors.ORANGE_700
+                            
+                            page.update()
+
+                            # 2. Patch Supabase
+                            try:
+                                res = supabase_request(f"packages?id=eq.{target_id}", method="PATCH", data={"status": selected_val})
+                                if not res:
+                                    show_alert("Warning: SQL policy blocked update.", ft.Colors.RED_600)
+                                else:
+                                    show_alert(f"Saved: {selected_val}", ft.Colors.GREEN_700)
+                            except Exception as ex:
+                                show_alert(f"Update error: {str(ex)}", ft.Colors.RED_600)
+
+                        return on_change
+
+                    status_dropdown.on_change = create_change_handler(pkg_id, status_dropdown, badge_cnt, badge_txt)
+
+                    card = ft.Card(
+                        content=ft.Container(
+                            padding=12,
+                            content=ft.Column([
+                                ft.Row([
+                                    ft.Text(f"{vendor}", weight=ft.FontWeight.BOLD, size=16),
+                                    badge_cnt
+                                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+                                ft.Text(f"Item: {desc}", size=14),
+                                ft.Text(f"Location: {loc or 'N/A'} | Rider: {rider or 'N/A'}", size=12, color=ft.Colors.GREY_700),
+                                ft.Row([
+                                    ft.Text(f"₦{total:,.2f}", weight=ft.FontWeight.BOLD, color=ft.Colors.GREEN_800),
+                                    ft.Row([
+                                        status_dropdown,
+                                        ft.IconButton(
+                                            icon=ft.Icons.DELETE_OUTLINED, 
+                                            icon_color=ft.Colors.RED_400,
+                                            on_click=lambda e, r_id=pkg_id: delete_record(r_id)
+                                        )
+                                    ])
+                                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
+                            ])
+                        )
+                    )
                     history_list.controls.append(card)
         except Exception as ex:
             history_list.controls.append(
