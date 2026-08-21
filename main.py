@@ -8,7 +8,6 @@ import time
 SUPABASE_URL = "https://nkllvhzebktydnqvjuoc.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5rbGx2aHplYmt0eWRucXZqdW9jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYyODQzNDMsImV4cCI6MjEwMTg2MDM0M30.zIPGzDv5krWPUaIJzTP2BnKhSxU5LjJ0DraR46zFFLI"
 
-# Direct HTTP Helper for Supabase REST API
 def supabase_request(endpoint: str, method: str = "GET", data: dict = None):
     url = f"{SUPABASE_URL}/rest/v1/{endpoint}"
     headers = {
@@ -250,35 +249,36 @@ def main(page: ft.Page):
                         ]
                     )
 
-                    # Explicit closure for status change
-                    def create_change_handler(target_id, d_control, b_cnt, b_txt):
+                    # Update status using the RPC function
+                    def bind_status_change(target_id, d_ctrl, b_cnt, b_txt):
                         def on_change(e):
-                            selected_val = d_control.value
+                            new_val = d_ctrl.value
                             
-                            # 1. Update UI locally right away
-                            b_txt.value = f" {selected_val} "
-                            if selected_val == "Delivered":
+                            # Update UI immediately on screen
+                            b_txt.value = f" {new_val} "
+                            if new_val == "Delivered":
                                 b_cnt.bgcolor = ft.Colors.GREEN_700
-                            elif selected_val == "In Transit":
+                            elif new_val == "In Transit":
                                 b_cnt.bgcolor = ft.Colors.BLUE_700
                             else:
                                 b_cnt.bgcolor = ft.Colors.ORANGE_700
                             
                             page.update()
 
-                            # 2. Patch Supabase
+                            # Direct RPC Call to Supabase
                             try:
-                                res = supabase_request(f"packages?id=eq.{target_id}", method="PATCH", data={"status": selected_val})
-                                if not res:
-                                    show_alert("Warning: SQL policy blocked update.", ft.Colors.RED_600)
-                                else:
-                                    show_alert(f"Saved: {selected_val}", ft.Colors.GREEN_700)
+                                supabase_request(
+                                    "rpc/update_package_status",
+                                    method="POST",
+                                    data={"row_id": int(target_id), "new_status": str(new_val)}
+                                )
+                                show_alert(f"Updated status to '{new_val}'", ft.Colors.GREEN_700)
                             except Exception as ex:
-                                show_alert(f"Update error: {str(ex)}", ft.Colors.RED_600)
+                                show_alert(f"RPC Error: {str(ex)}", ft.Colors.RED_600)
 
                         return on_change
 
-                    status_dropdown.on_change = create_change_handler(pkg_id, status_dropdown, badge_cnt, badge_txt)
+                    status_dropdown.on_change = bind_status_change(pkg_id, status_dropdown, badge_cnt, badge_txt)
 
                     card = ft.Card(
                         content=ft.Container(
