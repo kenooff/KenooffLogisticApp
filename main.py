@@ -8,6 +8,7 @@ import time
 SUPABASE_URL = "https://nkllvhzebktydnqvjuoc.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5rbGx2aHplYmt0eWRucXZqdW9jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYyODQzNDMsImV4cCI6MjEwMTg2MDM0M30.zIPGzDv5krWPUaIJzTP2BnKhSxU5LjJ0DraR46zFFLI"
 
+# Direct HTTP Helper for Supabase REST API
 def supabase_request(endpoint: str, method: str = "GET", data: dict = None):
     url = f"{SUPABASE_URL}/rest/v1/{endpoint}"
     headers = {
@@ -249,36 +250,37 @@ def main(page: ft.Page):
                         ]
                     )
 
-                    # Update status using the RPC function
-                    def bind_status_change(target_id, d_ctrl, b_cnt, b_txt):
-                        def on_change(e):
-                            new_val = d_ctrl.value
-                            
-                            # Update UI immediately on screen
-                            b_txt.value = f" {new_val} "
+                    # Update logic bound explicitly to this card's controls
+                    def make_status_listener(target_id, dropdown_ref, badge_c, badge_t):
+                        def on_dropdown_change(e):
+                            new_val = dropdown_ref.value
+
+                            # 1. Update Badge visual elements immediately
+                            badge_t.value = f" {new_val} "
                             if new_val == "Delivered":
-                                b_cnt.bgcolor = ft.Colors.GREEN_700
+                                badge_c.bgcolor = ft.Colors.GREEN_700
                             elif new_val == "In Transit":
-                                b_cnt.bgcolor = ft.Colors.BLUE_700
+                                badge_c.bgcolor = ft.Colors.BLUE_700
                             else:
-                                b_cnt.bgcolor = ft.Colors.ORANGE_700
-                            
+                                badge_c.bgcolor = ft.Colors.ORANGE_700
                             page.update()
 
-                            # Direct RPC Call to Supabase
+                            # 2. Patch database record in Supabase
                             try:
                                 supabase_request(
-                                    "rpc/update_package_status",
-                                    method="POST",
-                                    data={"row_id": int(target_id), "new_status": str(new_val)}
+                                    f"packages?id=eq.{target_id}",
+                                    method="PATCH",
+                                    data={"status": new_val}
                                 )
-                                show_alert(f"Updated status to '{new_val}'", ft.Colors.GREEN_700)
+                                show_alert(f"Saved: {new_val}", ft.Colors.GREEN_700)
                             except Exception as ex:
-                                show_alert(f"RPC Error: {str(ex)}", ft.Colors.RED_600)
+                                show_alert(f"Error saving status: {str(ex)}", ft.Colors.RED_600)
 
-                        return on_change
+                        return on_dropdown_change
 
-                    status_dropdown.on_change = bind_status_change(pkg_id, status_dropdown, badge_cnt, badge_txt)
+                    status_dropdown.on_change = make_status_listener(
+                        pkg_id, status_dropdown, badge_cnt, badge_txt
+                    )
 
                     card = ft.Card(
                         content=ft.Container(
