@@ -236,7 +236,7 @@ def main(page: ft.Page):
                     elif status == "In Transit":
                         status_color = ft.Colors.BLUE_700
 
-                    # Fixed Border syntax using ft.Border.all
+                    # Fixed Border & Padding syntax
                     status_menu = ft.PopupMenuButton(
                         content=ft.Container(
                             content=ft.Row([
@@ -245,7 +245,7 @@ def main(page: ft.Page):
                             ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, tight=True),
                             border=ft.Border.all(1, ft.Colors.GREY_400),
                             border_radius=6,
-                            padding=ft.padding.symmetric(horizontal=8, vertical=6)
+                            padding=ft.padding.only(left=8, right=8, top=6, bottom=6)
                         ),
                         items=[
                             ft.PopupMenuItem(
