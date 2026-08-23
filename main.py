@@ -236,7 +236,7 @@ def main(page: ft.Page):
                     elif status == "In Transit":
                         status_color = ft.Colors.BLUE_700
 
-                    # Fixed Padding using ft.Padding(left, top, right, bottom)
+                    # Fixed PopupMenuItem with content=ft.Text(...)
                     status_menu = ft.PopupMenuButton(
                         content=ft.Container(
                             content=ft.Row([
@@ -249,15 +249,15 @@ def main(page: ft.Page):
                         ),
                         items=[
                             ft.PopupMenuItem(
-                                text="Pending", 
+                                content=ft.Text("Pending"), 
                                 on_click=lambda e, r_id=pkg_id: change_status(r_id, "Pending")
                             ),
                             ft.PopupMenuItem(
-                                text="In Transit", 
+                                content=ft.Text("In Transit"), 
                                 on_click=lambda e, r_id=pkg_id: change_status(r_id, "In Transit")
                             ),
                             ft.PopupMenuItem(
-                                text="Delivered", 
+                                content=ft.Text("Delivered"), 
                                 on_click=lambda e, r_id=pkg_id: change_status(r_id, "Delivered")
                             ),
                         ]
