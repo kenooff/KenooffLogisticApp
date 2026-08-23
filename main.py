@@ -39,7 +39,6 @@ def main(page: ft.Page):
 
     time.sleep(0.3)
 
-    # In-memory storage for fetched rows to enable fast filtering & analytics
     all_rows_cache = []
     active_filter_status = "All"
 
@@ -199,7 +198,6 @@ def main(page: ft.Page):
     delivered_count_text = ft.Text("0", size=15, weight=ft.FontWeight.BOLD, color=ft.Colors.GREEN_700)
     pending_count_text = ft.Text("0", size=15, weight=ft.FontWeight.BOLD, color=ft.Colors.ORANGE_700)
 
-    # Feature 3: Summary Analytics Cards
     analytics_row = ft.Row(
         controls=[
             ft.Container(
@@ -222,7 +220,6 @@ def main(page: ft.Page):
         spacing=6
     )
 
-    # Feature 1: Search & Filter Controls
     search_input = ft.TextField(
         hint_text="Search vendor, rider, location...", 
         prefix_icon=ft.Icons.SEARCH, 
@@ -230,7 +227,6 @@ def main(page: ft.Page):
         dense=True
     )
 
-    # Feature 5: Export CSV Button & Function
     def export_csv(e):
         if not all_rows_cache:
             show_alert("No records available to export!", ft.Colors.RED_600)
@@ -244,9 +240,9 @@ def main(page: ft.Page):
 
         full_csv = csv_headers + "\n".join(csv_rows)
         
-        # Saves or prints CSV payload for easy export
-        page.set_clipboard(full_csv)
-        show_alert("All record logs copied to clipboard in CSV format!", ft.Colors.GREEN_800)
+        # Updated Clipboard Syntax
+        page.clipboard = full_csv
+        show_alert("CSV logs copied to clipboard!", ft.Colors.GREEN_800)
 
     export_btn = ft.IconButton(
         icon=ft.Icons.DOWNLOAD, 
@@ -274,11 +270,9 @@ def main(page: ft.Page):
 
         filtered_rows = []
         for r in all_rows_cache:
-            # Status Filter
             if active_filter_status != "All" and r.get("status") != active_filter_status:
                 continue
             
-            # Text Search Filter (Vendor, Package, Rider, Location)
             vendor = str(r.get("vendor", "")).lower()
             desc = str(r.get("package_desc", "")).lower()
             rider = str(r.get("rider", "")).lower()
@@ -308,7 +302,6 @@ def main(page: ft.Page):
                 status = str(row.get("status", "Pending"))
                 raw_time = row.get("created_at", "")
 
-                # Feature 2: Format Date & Time
                 formatted_time = "N/A"
                 if raw_time:
                     try:
@@ -388,7 +381,6 @@ def main(page: ft.Page):
 
     search_input.on_change = render_filtered_cards
 
-    # Filter Segment Buttons
     def set_filter(status):
         nonlocal active_filter_status
         active_filter_status = status
