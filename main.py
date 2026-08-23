@@ -8,7 +8,6 @@ import time
 SUPABASE_URL = "https://nkllvhzebktydnqvjuoc.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5rbGx2aHplYmt0eWRucXZqdW9jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYyODQzNDMsImV4cCI6MjEwMTg2MDM0M30.zIPGzDv5krWPUaIJzTP2BnKhSxU5LjJ0DraR46zFFLI"
 
-# Direct HTTP Helper for Supabase REST API
 def supabase_request(endpoint: str, method: str = "GET", data: dict = None):
     url = f"{SUPABASE_URL}/rest/v1/{endpoint}"
     headers = {
@@ -200,6 +199,30 @@ def main(page: ft.Page):
         except Exception as ex:
             show_alert(f"Failed to delete: {str(ex)}", ft.Colors.RED_600)
 
+    def update_package_status(pkg_id, new_status, badge_cnt, badge_txt):
+        try:
+            # Send standard REST query to update status
+            res = supabase_request(f"packages?id=eq.{pkg_id}", method="PATCH", data={"status": new_status})
+            
+            if not res or len(res) == 0:
+                show_alert(f"Update failed: Row ID {pkg_id} rejected by database.", ft.Colors.RED_600)
+                return
+
+            # Update Badge visual elements upon successful response
+            badge_txt.value = f" {new_status} "
+            if new_status == "Delivered":
+                badge_cnt.bgcolor = ft.Colors.GREEN_700
+            elif new_status == "In Transit":
+                badge_cnt.bgcolor = ft.Colors.BLUE_700
+            else:
+                badge_cnt.bgcolor = ft.Colors.ORANGE_700
+
+            show_alert(f"Saved: {new_status}", ft.Colors.GREEN_700)
+            page.update()
+
+        except Exception as ex:
+            show_alert(f"Cloud update error: {str(ex)}", ft.Colors.RED_600)
+
     def load_database_records():
         history_list.controls.clear()
         try:
@@ -250,37 +273,8 @@ def main(page: ft.Page):
                         ]
                     )
 
-                    # Update logic bound explicitly to this card's controls
-                    def make_status_listener(target_id, dropdown_ref, badge_c, badge_t):
-                        def on_dropdown_change(e):
-                            new_val = dropdown_ref.value
-
-                            # 1. Update Badge visual elements immediately
-                            badge_t.value = f" {new_val} "
-                            if new_val == "Delivered":
-                                badge_c.bgcolor = ft.Colors.GREEN_700
-                            elif new_val == "In Transit":
-                                badge_c.bgcolor = ft.Colors.BLUE_700
-                            else:
-                                badge_c.bgcolor = ft.Colors.ORANGE_700
-                            page.update()
-
-                            # 2. Patch database record in Supabase
-                            try:
-                                supabase_request(
-                                    f"packages?id=eq.{target_id}",
-                                    method="PATCH",
-                                    data={"status": new_val}
-                                )
-                                show_alert(f"Saved: {new_val}", ft.Colors.GREEN_700)
-                            except Exception as ex:
-                                show_alert(f"Error saving status: {str(ex)}", ft.Colors.RED_600)
-
-                        return on_dropdown_change
-
-                    status_dropdown.on_change = make_status_listener(
-                        pkg_id, status_dropdown, badge_cnt, badge_txt
-                    )
+                    # Bind directly using lambda with strict variables
+                    status_dropdown.on_change = lambda e, p_id=pkg_id, b_cnt=badge_cnt, b_txt=badge_txt: update_package_status(p_id, e.control.value, b_cnt, b_txt)
 
                     card = ft.Card(
                         content=ft.Container(
