@@ -8,6 +8,7 @@ import time
 SUPABASE_URL = "https://nkllvhzebktydnqvjuoc.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5rbGx2aHplYmt0eWRucXZqdW9jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYyODQzNDMsImV4cCI6MjEwMTg2MDM0M30.zIPGzDv5krWPUaIJzTP2BnKhSxU5LjJ0DraR46zFFLI"
 
+# Direct HTTP Helper for Supabase REST API
 def supabase_request(endpoint: str, method: str = "GET", data: dict = None):
     url = f"{SUPABASE_URL}/rest/v1/{endpoint}"
     headers = {
@@ -195,33 +196,17 @@ def main(page: ft.Page):
             supabase_request(f"packages?id=eq.{record_id}", method="DELETE")
             show_alert("Record deleted from Cloud!", ft.Colors.GREY_700)
             load_database_records()
-            page.update()
         except Exception as ex:
             show_alert(f"Failed to delete: {str(ex)}", ft.Colors.RED_600)
 
-    def update_package_status(pkg_id, new_status, badge_cnt, badge_txt):
+    # DIRECT STATUS UPDATE FUNCTION
+    def change_status(record_id, new_status):
         try:
-            # Send standard REST query to update status
-            res = supabase_request(f"packages?id=eq.{pkg_id}", method="PATCH", data={"status": new_status})
-            
-            if not res or len(res) == 0:
-                show_alert(f"Update failed: Row ID {pkg_id} rejected by database.", ft.Colors.RED_600)
-                return
-
-            # Update Badge visual elements upon successful response
-            badge_txt.value = f" {new_status} "
-            if new_status == "Delivered":
-                badge_cnt.bgcolor = ft.Colors.GREEN_700
-            elif new_status == "In Transit":
-                badge_cnt.bgcolor = ft.Colors.BLUE_700
-            else:
-                badge_cnt.bgcolor = ft.Colors.ORANGE_700
-
-            show_alert(f"Saved: {new_status}", ft.Colors.GREEN_700)
-            page.update()
-
+            supabase_request(f"packages?id=eq.{record_id}", method="PATCH", data={"status": new_status})
+            show_alert(f"Status changed to '{new_status}'!", ft.Colors.GREEN_700)
+            load_database_records()
         except Exception as ex:
-            show_alert(f"Cloud update error: {str(ex)}", ft.Colors.RED_600)
+            show_alert(f"Failed to update status: {str(ex)}", ft.Colors.RED_600)
 
     def load_database_records():
         history_list.controls.clear()
@@ -244,37 +229,40 @@ def main(page: ft.Page):
                     total = row.get("total_value", 0.0) or 0.0
                     loc = row.get("location", "")
                     rider = row.get("rider", "")
-                    current_status = str(row.get("status", "Pending"))
+                    status = str(row.get("status", "Pending"))
 
                     status_color = ft.Colors.ORANGE_700
-                    if current_status == "Delivered":
+                    if status == "Delivered":
                         status_color = ft.Colors.GREEN_700
-                    elif current_status == "In Transit":
+                    elif status == "In Transit":
                         status_color = ft.Colors.BLUE_700
 
-                    badge_txt = ft.Text(f" {current_status} ", color=ft.Colors.WHITE, size=12)
-                    badge_cnt = ft.Container(
-                        content=badge_txt,
-                        bgcolor=status_color,
-                        border_radius=4,
-                        padding=4
-                    )
-
-                    status_dropdown = ft.Dropdown(
-                        value=current_status,
-                        width=140,
-                        height=40,
-                        text_size=12,
-                        border_radius=6,
-                        options=[
-                            ft.dropdown.Option("Pending"),
-                            ft.dropdown.Option("In Transit"),
-                            ft.dropdown.Option("Delivered"),
+                    # Action Menu Button replacing Dropdown for 100% Reliability
+                    status_menu = ft.PopupMenuButton(
+                        content=ft.Container(
+                            content=ft.Row([
+                                ft.Text(status, color=ft.Colors.BLACK, size=13, weight=ft.FontWeight.W_500),
+                                ft.Icon(ft.Icons.ARROW_DROP_DOWN, color=ft.Colors.BLACK54, size=18)
+                            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, tight=True),
+                            border=ft.border.all(1, ft.Colors.GREY_400),
+                            border_radius=6,
+                            padding=ft.padding.symmetric(horizontal=8, vertical=6)
+                        ),
+                        items=[
+                            ft.PopupMenuItem(
+                                text="Pending", 
+                                on_click=lambda e, r_id=pkg_id: change_status(r_id, "Pending")
+                            ),
+                            ft.PopupMenuItem(
+                                text="In Transit", 
+                                on_click=lambda e, r_id=pkg_id: change_status(r_id, "In Transit")
+                            ),
+                            ft.PopupMenuItem(
+                                text="Delivered", 
+                                on_click=lambda e, r_id=pkg_id: change_status(r_id, "Delivered")
+                            ),
                         ]
                     )
-
-                    # Bind directly using lambda with strict variables
-                    status_dropdown.on_change = lambda e, p_id=pkg_id, b_cnt=badge_cnt, b_txt=badge_txt: update_package_status(p_id, e.control.value, b_cnt, b_txt)
 
                     card = ft.Card(
                         content=ft.Container(
@@ -282,14 +270,19 @@ def main(page: ft.Page):
                             content=ft.Column([
                                 ft.Row([
                                     ft.Text(f"{vendor}", weight=ft.FontWeight.BOLD, size=16),
-                                    badge_cnt
+                                    ft.Container(
+                                        content=ft.Text(f" {status} ", color=ft.Colors.WHITE, size=12),
+                                        bgcolor=status_color,
+                                        border_radius=4,
+                                        padding=4
+                                    )
                                 ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
                                 ft.Text(f"Item: {desc}", size=14),
                                 ft.Text(f"Location: {loc or 'N/A'} | Rider: {rider or 'N/A'}", size=12, color=ft.Colors.GREY_700),
                                 ft.Row([
                                     ft.Text(f"₦{total:,.2f}", weight=ft.FontWeight.BOLD, color=ft.Colors.GREEN_800),
                                     ft.Row([
-                                        status_dropdown,
+                                        status_menu,
                                         ft.IconButton(
                                             icon=ft.Icons.DELETE_OUTLINED, 
                                             icon_color=ft.Colors.RED_400,
@@ -308,6 +301,7 @@ def main(page: ft.Page):
                     padding=20
                 )
             )
+        page.update()
 
     body = ft.Container(content=form_view, padding=12, expand=True)
 
