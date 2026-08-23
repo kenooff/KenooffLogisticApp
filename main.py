@@ -3,6 +3,7 @@ import json
 import urllib.request
 import urllib.parse
 import time
+from datetime import datetime
 
 # ==================== SUPABASE CONFIG ====================
 SUPABASE_URL = "https://nkllvhzebktydnqvjuoc.supabase.co"
@@ -37,6 +38,10 @@ def main(page: ft.Page):
     page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
 
     time.sleep(0.3)
+
+    # In-memory storage for fetched rows to enable fast filtering & analytics
+    all_rows_cache = []
+    active_filter_status = "All"
 
     def show_alert(message: str, bg_color):
         snack = ft.SnackBar(
@@ -188,8 +193,213 @@ def main(page: ft.Page):
         ]
     )
 
-    # ==================== DATA HISTORY & UPDATE ====================
+    # ==================== ANALYTICS & FILTERING CONTROLS ====================
+    total_rev_text = ft.Text("₦0.00", size=15, weight=ft.FontWeight.BOLD, color=ft.Colors.GREEN_800)
+    total_count_text = ft.Text("0", size=15, weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_800)
+    delivered_count_text = ft.Text("0", size=15, weight=ft.FontWeight.BOLD, color=ft.Colors.GREEN_700)
+    pending_count_text = ft.Text("0", size=15, weight=ft.FontWeight.BOLD, color=ft.Colors.ORANGE_700)
+
+    # Feature 3: Summary Analytics Cards
+    analytics_row = ft.Row(
+        controls=[
+            ft.Container(
+                content=ft.Column([ft.Text("Total Rev.", size=10, color=ft.Colors.GREY_600), total_rev_text], spacing=2),
+                bgcolor=ft.Colors.GREEN_50, padding=8, border_radius=6, expand=True
+            ),
+            ft.Container(
+                content=ft.Column([ft.Text("Total Pkgs", size=10, color=ft.Colors.GREY_600), total_count_text], spacing=2),
+                bgcolor=ft.Colors.BLUE_50, padding=8, border_radius=6, expand=True
+            ),
+            ft.Container(
+                content=ft.Column([ft.Text("Delivered", size=10, color=ft.Colors.GREY_600), delivered_count_text], spacing=2),
+                bgcolor=ft.Colors.GREEN_100, padding=8, border_radius=6, expand=True
+            ),
+            ft.Container(
+                content=ft.Column([ft.Text("Pending", size=10, color=ft.Colors.GREY_600), pending_count_text], spacing=2),
+                bgcolor=ft.Colors.ORANGE_50, padding=8, border_radius=6, expand=True
+            ),
+        ],
+        spacing=6
+    )
+
+    # Feature 1: Search & Filter Controls
+    search_input = ft.TextField(
+        hint_text="Search vendor, rider, location...", 
+        prefix_icon=ft.Icons.SEARCH, 
+        border_radius=8, 
+        dense=True
+    )
+
+    # Feature 5: Export CSV Button & Function
+    def export_csv(e):
+        if not all_rows_cache:
+            show_alert("No records available to export!", ft.Colors.RED_600)
+            return
+
+        csv_headers = "ID,Vendor,Package Description,Quantity,Unit Price,Total Value,Location,Rider,Delivery Charge,Payment Method,Status,Created At\n"
+        csv_rows = []
+        for r in all_rows_cache:
+            row_str = f'"{r.get("id")}","{r.get("vendor","")}","{r.get("package_desc","")}",{r.get("quantity",0)},{r.get("unit_price",0)},{r.get("total_value",0)},"{r.get("location","")}","{r.get("rider","")}",{r.get("delivery_charge",0)},"{r.get("payment_method","")}","{r.get("status","")}","{r.get("created_at","")}"'
+            csv_rows.append(row_str)
+
+        full_csv = csv_headers + "\n".join(csv_rows)
+        
+        # Saves or prints CSV payload for easy export
+        page.set_clipboard(full_csv)
+        show_alert("All record logs copied to clipboard in CSV format!", ft.Colors.GREEN_800)
+
+    export_btn = ft.IconButton(
+        icon=ft.Icons.DOWNLOAD, 
+        tooltip="Export CSV", 
+        icon_color=ft.Colors.BLUE_800,
+        on_click=export_csv
+    )
+
     history_list = ft.ListView(spacing=10, expand=True)
+
+    def update_analytics(rows):
+        total_rev = sum(r.get("total_value", 0.0) or 0.0 for r in rows)
+        total_count = len(rows)
+        delivered_count = sum(1 for r in rows if r.get("status") == "Delivered")
+        pending_count = sum(1 for r in rows if r.get("status") in ["Pending", "In Transit"])
+
+        total_rev_text.value = f"₦{total_rev:,.0f}"
+        total_count_text.value = str(total_count)
+        delivered_count_text.value = str(delivered_count)
+        pending_count_text.value = str(pending_count)
+
+    def render_filtered_cards(e=None):
+        history_list.controls.clear()
+        query = search_input.value.lower() if search_input.value else ""
+
+        filtered_rows = []
+        for r in all_rows_cache:
+            # Status Filter
+            if active_filter_status != "All" and r.get("status") != active_filter_status:
+                continue
+            
+            # Text Search Filter (Vendor, Package, Rider, Location)
+            vendor = str(r.get("vendor", "")).lower()
+            desc = str(r.get("package_desc", "")).lower()
+            rider = str(r.get("rider", "")).lower()
+            loc = str(r.get("location", "")).lower()
+
+            if query and query not in vendor and query not in desc and query not in rider and query not in loc:
+                continue
+
+            filtered_rows.append(r)
+
+        if not filtered_rows:
+            history_list.controls.append(
+                ft.Container(
+                    content=ft.Text("No matching packages found.", italic=True, color=ft.Colors.GREY_500),
+                    alignment=ft.Alignment.CENTER,
+                    padding=20
+                )
+            )
+        else:
+            for row in filtered_rows:
+                pkg_id = row.get("id")
+                vendor = row.get("vendor", "")
+                desc = row.get("package_desc", "")
+                total = row.get("total_value", 0.0) or 0.0
+                loc = row.get("location", "")
+                rider = row.get("rider", "")
+                status = str(row.get("status", "Pending"))
+                raw_time = row.get("created_at", "")
+
+                # Feature 2: Format Date & Time
+                formatted_time = "N/A"
+                if raw_time:
+                    try:
+                        clean_time = raw_time.split(".")[0].replace("T", " ")
+                        dt = datetime.strptime(clean_time, "%Y-%m-%d %H:%M:%S")
+                        formatted_time = dt.strftime("%b %d, %I:%M %p")
+                    except Exception:
+                        formatted_time = raw_time[:16].replace("T", " ")
+
+                status_color = ft.Colors.ORANGE_700
+                if status == "Delivered":
+                    status_color = ft.Colors.GREEN_700
+                elif status == "In Transit":
+                    status_color = ft.Colors.BLUE_700
+
+                status_menu = ft.PopupMenuButton(
+                    content=ft.Container(
+                        content=ft.Row([
+                            ft.Text(status, color=ft.Colors.BLACK, size=13, weight=ft.FontWeight.W_500),
+                            ft.Icon(ft.Icons.ARROW_DROP_DOWN, color=ft.Colors.BLACK54, size=18)
+                        ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, tight=True),
+                        border=ft.Border.all(1, ft.Colors.GREY_400),
+                        border_radius=6,
+                        padding=ft.Padding(8, 6, 8, 6)
+                    ),
+                    items=[
+                        ft.PopupMenuItem(
+                            content=ft.Text("Pending"), 
+                            on_click=lambda e, r_id=pkg_id: change_status(r_id, "Pending")
+                        ),
+                        ft.PopupMenuItem(
+                            content=ft.Text("In Transit"), 
+                            on_click=lambda e, r_id=pkg_id: change_status(r_id, "In Transit")
+                        ),
+                        ft.PopupMenuItem(
+                            content=ft.Text("Delivered"), 
+                            on_click=lambda e, r_id=pkg_id: change_status(r_id, "Delivered")
+                        ),
+                    ]
+                )
+
+                card = ft.Card(
+                    content=ft.Container(
+                        padding=12,
+                        content=ft.Column([
+                            ft.Row([
+                                ft.Column([
+                                    ft.Text(f"{vendor}", weight=ft.FontWeight.BOLD, size=16),
+                                    ft.Text(f"Logged: {formatted_time}", size=10, color=ft.Colors.GREY_500)
+                                ], spacing=1),
+                                ft.Container(
+                                    content=ft.Text(f" {status} ", color=ft.Colors.WHITE, size=12),
+                                    bgcolor=status_color,
+                                    border_radius=4,
+                                    padding=4
+                                )
+                            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+                            ft.Text(f"Item: {desc}", size=14),
+                            ft.Text(f"Location: {loc or 'N/A'} | Rider: {rider or 'N/A'}", size=12, color=ft.Colors.GREY_700),
+                            ft.Row([
+                                ft.Text(f"₦{total:,.2f}", weight=ft.FontWeight.BOLD, color=ft.Colors.GREEN_800),
+                                ft.Row([
+                                    status_menu,
+                                    ft.IconButton(
+                                        icon=ft.Icons.DELETE_OUTLINED, 
+                                        icon_color=ft.Colors.RED_400,
+                                        on_click=lambda e, r_id=pkg_id: delete_record(r_id)
+                                    )
+                                ])
+                            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
+                        ])
+                    )
+                )
+                history_list.controls.append(card)
+
+        page.update()
+
+    search_input.on_change = render_filtered_cards
+
+    # Filter Segment Buttons
+    def set_filter(status):
+        nonlocal active_filter_status
+        active_filter_status = status
+        render_filtered_cards()
+
+    filter_buttons = ft.Row([
+        ft.OutlinedButton("All", on_click=lambda e: set_filter("All")),
+        ft.OutlinedButton("Pending", on_click=lambda e: set_filter("Pending")),
+        ft.OutlinedButton("In Transit", on_click=lambda e: set_filter("In Transit")),
+        ft.OutlinedButton("Delivered", on_click=lambda e: set_filter("Delivered")),
+    ], scroll=ft.ScrollMode.AUTO, spacing=6)
 
     def delete_record(record_id):
         try:
@@ -208,99 +418,28 @@ def main(page: ft.Page):
             show_alert(f"Failed to update status: {str(ex)}", ft.Colors.RED_600)
 
     def load_database_records():
-        history_list.controls.clear()
+        nonlocal all_rows_cache
         try:
-            rows = supabase_request("packages?select=*&order=id.desc", method="GET")
-
-            if not rows:
-                history_list.controls.append(
-                    ft.Container(
-                        content=ft.Text("No saved packages found in online database.", italic=True, color=ft.Colors.GREY_500),
-                        alignment=ft.Alignment.CENTER,
-                        padding=20
-                    )
-                )
-            else:
-                for row in rows:
-                    pkg_id = row.get("id")
-                    vendor = row.get("vendor", "")
-                    desc = row.get("package_desc", "")
-                    total = row.get("total_value", 0.0) or 0.0
-                    loc = row.get("location", "")
-                    rider = row.get("rider", "")
-                    status = str(row.get("status", "Pending"))
-
-                    status_color = ft.Colors.ORANGE_700
-                    if status == "Delivered":
-                        status_color = ft.Colors.GREEN_700
-                    elif status == "In Transit":
-                        status_color = ft.Colors.BLUE_700
-
-                    # Fixed PopupMenuItem with content=ft.Text(...)
-                    status_menu = ft.PopupMenuButton(
-                        content=ft.Container(
-                            content=ft.Row([
-                                ft.Text(status, color=ft.Colors.BLACK, size=13, weight=ft.FontWeight.W_500),
-                                ft.Icon(ft.Icons.ARROW_DROP_DOWN, color=ft.Colors.BLACK54, size=18)
-                            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, tight=True),
-                            border=ft.Border.all(1, ft.Colors.GREY_400),
-                            border_radius=6,
-                            padding=ft.Padding(8, 6, 8, 6)
-                        ),
-                        items=[
-                            ft.PopupMenuItem(
-                                content=ft.Text("Pending"), 
-                                on_click=lambda e, r_id=pkg_id: change_status(r_id, "Pending")
-                            ),
-                            ft.PopupMenuItem(
-                                content=ft.Text("In Transit"), 
-                                on_click=lambda e, r_id=pkg_id: change_status(r_id, "In Transit")
-                            ),
-                            ft.PopupMenuItem(
-                                content=ft.Text("Delivered"), 
-                                on_click=lambda e, r_id=pkg_id: change_status(r_id, "Delivered")
-                            ),
-                        ]
-                    )
-
-                    card = ft.Card(
-                        content=ft.Container(
-                            padding=12,
-                            content=ft.Column([
-                                ft.Row([
-                                    ft.Text(f"{vendor}", weight=ft.FontWeight.BOLD, size=16),
-                                    ft.Container(
-                                        content=ft.Text(f" {status} ", color=ft.Colors.WHITE, size=12),
-                                        bgcolor=status_color,
-                                        border_radius=4,
-                                        padding=4
-                                    )
-                                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-                                ft.Text(f"Item: {desc}", size=14),
-                                ft.Text(f"Location: {loc or 'N/A'} | Rider: {rider or 'N/A'}", size=12, color=ft.Colors.GREY_700),
-                                ft.Row([
-                                    ft.Text(f"₦{total:,.2f}", weight=ft.FontWeight.BOLD, color=ft.Colors.GREEN_800),
-                                    ft.Row([
-                                        status_menu,
-                                        ft.IconButton(
-                                            icon=ft.Icons.DELETE_OUTLINED, 
-                                            icon_color=ft.Colors.RED_400,
-                                            on_click=lambda e, r_id=pkg_id: delete_record(r_id)
-                                        )
-                                    ])
-                                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
-                            ])
-                        )
-                    )
-                    history_list.controls.append(card)
+            all_rows_cache = supabase_request("packages?select=*&order=id.desc", method="GET")
+            update_analytics(all_rows_cache)
+            render_filtered_cards()
         except Exception as ex:
+            history_list.controls.clear()
             history_list.controls.append(
                 ft.Container(
                     content=ft.Text(f"Error connecting to Cloud Database: {str(ex)}", color=ft.Colors.RED_500),
                     padding=20
                 )
             )
-        page.update()
+            page.update()
+
+    history_view = ft.Column([
+        analytics_row,
+        ft.Row([search_input, export_btn], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+        filter_buttons,
+        ft.Divider(height=5),
+        history_list
+    ], expand=True, spacing=10)
 
     body = ft.Container(content=form_view, padding=12, expand=True)
 
@@ -310,7 +449,7 @@ def main(page: ft.Page):
             body.content = form_view
         else:
             load_database_records()
-            body.content = history_list
+            body.content = history_view
         page.update()
 
     page.navigation_bar = ft.NavigationBar(
