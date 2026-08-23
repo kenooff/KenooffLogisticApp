@@ -199,7 +199,6 @@ def main(page: ft.Page):
         except Exception as ex:
             show_alert(f"Failed to delete: {str(ex)}", ft.Colors.RED_600)
 
-    # DIRECT STATUS UPDATE FUNCTION
     def change_status(record_id, new_status):
         try:
             supabase_request(f"packages?id=eq.{record_id}", method="PATCH", data={"status": new_status})
@@ -237,14 +236,14 @@ def main(page: ft.Page):
                     elif status == "In Transit":
                         status_color = ft.Colors.BLUE_700
 
-                    # Action Menu Button replacing Dropdown for 100% Reliability
+                    # Fixed Border syntax using ft.Border.all
                     status_menu = ft.PopupMenuButton(
                         content=ft.Container(
                             content=ft.Row([
                                 ft.Text(status, color=ft.Colors.BLACK, size=13, weight=ft.FontWeight.W_500),
                                 ft.Icon(ft.Icons.ARROW_DROP_DOWN, color=ft.Colors.BLACK54, size=18)
                             ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, tight=True),
-                            border=ft.border.all(1, ft.Colors.GREY_400),
+                            border=ft.Border.all(1, ft.Colors.GREY_400),
                             border_radius=6,
                             padding=ft.padding.symmetric(horizontal=8, vertical=6)
                         ),
