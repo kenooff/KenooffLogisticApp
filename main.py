@@ -239,10 +239,48 @@ def main(page: ft.Page):
             csv_rows.append(row_str)
 
         full_csv = csv_headers + "\n".join(csv_rows)
-        
-        # Updated Clipboard Syntax
-        page.clipboard = full_csv
-        show_alert("CSV logs copied to clipboard!", ft.Colors.GREEN_800)
+
+        csv_text_field = ft.TextField(
+            value=full_csv,
+            multiline=True,
+            read_only=True,
+            min_lines=8,
+            max_lines=12,
+            text_size=11,
+            border_radius=8
+        )
+
+        def close_dialog(e):
+            dialog.open = False
+            page.update()
+
+        def copy_to_clipboard(e):
+            try:
+                page.set_clipboard(full_csv)
+                show_alert("CSV copied to clipboard!", ft.Colors.GREEN_800)
+            except Exception:
+                try:
+                    page.set_clipboard_async(full_csv)
+                    show_alert("CSV copied to clipboard!", ft.Colors.GREEN_800)
+                except Exception:
+                    show_alert("Select text to copy manually.", ft.Colors.ORANGE_700)
+
+        dialog = ft.AlertDialog(
+            title=ft.Text("Export CSV Logs", size=16, weight=ft.FontWeight.BOLD),
+            content=ft.Column([
+                ft.Text("Tap below to copy your raw CSV log data:", size=12, color=ft.Colors.GREY_700),
+                csv_text_field
+            ], tight=True, spacing=8),
+            actions=[
+                ft.TextButton("Copy CSV", on_click=copy_to_clipboard),
+                ft.TextButton("Close", on_click=close_dialog),
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+        )
+
+        page.overlay.append(dialog)
+        dialog.open = True
+        page.update()
 
     export_btn = ft.IconButton(
         icon=ft.Icons.DOWNLOAD, 
