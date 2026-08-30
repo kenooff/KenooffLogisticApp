@@ -31,13 +31,10 @@ jobs:
         with:
           channel: 'stable'
 
-      - name: Install dependencies into App Bundle
+      - name: Install Flet CLI
         run: |
           python -m pip install --upgrade pip
-          pip install flet[all]
-          
-          # Force-install requirements into current directory for Flet bundling
-          if [ -f requirements.txt ]; then pip install -r requirements.txt --target .; fi
+          pip install "flet[all]"
 
       - name: Build APK using Flet CLI
         run: |
