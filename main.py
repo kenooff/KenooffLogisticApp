@@ -3,13 +3,22 @@ import json
 import urllib.request
 import urllib.parse
 import time
+import os
+import tempfile
 from datetime import datetime
+
+# Excel & PDF Libraries
+import openpyxl
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib import colors
 
 # ==================== SUPABASE CONFIG ====================
 SUPABASE_URL = "https://nkllvhzebktydnqvjuoc.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5rbGx2aHplYmt0eWRucXZqdW9jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYyODQzNDMsImV4cCI6MjEwMTg2MDM0M30.zIPGzDv5krWPUaIJzTP2BnKhSxU5LjJ0DraR46zFFLI"
 
-# Direct HTTP Helper for Supabase REST API
 def supabase_request(endpoint: str, method: str = "GET", data: dict = None):
     url = f"{SUPABASE_URL}/rest/v1/{endpoint}"
     headers = {
@@ -227,53 +236,119 @@ def main(page: ft.Page):
         dense=True
     )
 
-    def export_csv(e):
+    # ==================== EXPORT FUNCTIONALITY (EXCEL & PDF) ====================
+    def generate_excel():
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Logistics Report"
+
+        headers = ["ID", "Vendor", "Package Description", "Qty", "Unit Price (₦)", "Total Value (₦)", "Location", "Rider", "Delivery Charge (₦)", "Payment", "Status", "Date"]
+        ws.append(headers)
+
+        header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+        header_fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
+        
+        for col in range(1, len(headers) + 1):
+            cell = ws.cell(row=1, column=col)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+
+        for r in all_rows_cache:
+            ws.append([
+                r.get("id"),
+                r.get("vendor", ""),
+                r.get("package_desc", ""),
+                r.get("quantity", 0),
+                r.get("unit_price", 0),
+                r.get("total_value", 0),
+                r.get("location", ""),
+                r.get("rider", ""),
+                r.get("delivery_charge", 0),
+                r.get("payment_method", ""),
+                r.get("status", ""),
+                str(r.get("created_at", ""))[:16].replace("T", " ")
+            ])
+
+        temp_dir = tempfile.gettempdir()
+        filepath = os.path.join(temp_dir, "Kenooff_Logistics_Report.xlsx")
+        wb.save(filepath)
+        return filepath
+
+    def generate_pdf():
+        temp_dir = tempfile.gettempdir()
+        filepath = os.path.join(temp_dir, "Kenooff_Logistics_Report.pdf")
+
+        doc = SimpleDocTemplate(filepath, pagesize=letter, rightMargin=20, leftMargin=20, topMargin=20, bottomMargin=20)
+        styles = getSampleStyleSheet()
+        elements = []
+
+        title_style = ParagraphStyle("TitleStyle", parent=styles["Heading1"], fontSize=18, textColor=colors.HexColor("#1F4E78"), spaceAfter=10)
+        elements.append(Paragraph("Kenooff Logistics - Package History Report", title_style))
+        elements.append(Paragraph(f"Generated on: {datetime.now().strftime('%Y-%m-%d %I:%M %p')}", styles["Normal"]))
+        elements.append(Spacer(1, 15))
+
+        table_data = [["ID", "Vendor", "Package", "Rider", "Location", "Total (₦)", "Status"]]
+        for r in all_rows_cache:
+            table_data.append([
+                str(r.get("id")),
+                str(r.get("vendor", "")),
+                str(r.get("package_desc", "")),
+                str(r.get("rider", "")),
+                str(r.get("location", "")),
+                f"₦{r.get('total_value', 0):,.2f}",
+                str(r.get("status", ""))
+            ])
+
+        t = Table(table_data, colWidths=[30, 80, 110, 80, 90, 80, 70])
+        t.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1F4E78")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, 0), 10),
+            ("BOTTOMPADDING", (0, 0), (-1, 0), 8),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.lightgrey),
+            ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+            ("FONTSIZE", (0, 1), (-1, -1), 9),
+        ]))
+        elements.append(t)
+        doc.build(elements)
+        return filepath
+
+    def open_export_menu(e):
         if not all_rows_cache:
             show_alert("No records available to export!", ft.Colors.RED_600)
             return
 
-        csv_headers = "ID,Vendor,Package Description,Quantity,Unit Price,Total Value,Location,Rider,Delivery Charge,Payment Method,Status,Created At\n"
-        csv_rows = []
-        for r in all_rows_cache:
-            row_str = f'"{r.get("id")}","{r.get("vendor","")}","{r.get("package_desc","")}",{r.get("quantity",0)},{r.get("unit_price",0)},{r.get("total_value",0)},"{r.get("location","")}","{r.get("rider","")}",{r.get("delivery_charge",0)},"{r.get("payment_method","")}","{r.get("status","")}","{r.get("created_at","")}"'
-            csv_rows.append(row_str)
+        def handle_excel_gen(e):
+            try:
+                path = generate_excel()
+                show_alert(f"Excel report created successfully!", ft.Colors.GREEN_800)
+            except Exception as ex:
+                show_alert(f"Excel Export Error: {str(ex)}", ft.Colors.RED_600)
+            dialog.open = False
+            page.update()
 
-        full_csv = csv_headers + "\n".join(csv_rows)
-
-        csv_text_field = ft.TextField(
-            value=full_csv,
-            multiline=True,
-            read_only=True,
-            min_lines=8,
-            max_lines=12,
-            text_size=11,
-            border_radius=8
-        )
+        def handle_pdf_gen(e):
+            try:
+                path = generate_pdf()
+                show_alert(f"PDF report generated successfully!", ft.Colors.GREEN_800)
+            except Exception as ex:
+                show_alert(f"PDF Export Error: {str(ex)}", ft.Colors.RED_600)
+            dialog.open = False
+            page.update()
 
         def close_dialog(e):
             dialog.open = False
             page.update()
 
-        def copy_to_clipboard(e):
-            try:
-                page.set_clipboard(full_csv)
-                show_alert("CSV copied to clipboard!", ft.Colors.GREEN_800)
-            except Exception:
-                try:
-                    page.set_clipboard_async(full_csv)
-                    show_alert("CSV copied to clipboard!", ft.Colors.GREEN_800)
-                except Exception:
-                    show_alert("Select text to copy manually.", ft.Colors.ORANGE_700)
-
         dialog = ft.AlertDialog(
-            title=ft.Text("Export CSV Logs", size=16, weight=ft.FontWeight.BOLD),
-            content=ft.Column([
-                ft.Text("Tap below to copy your raw CSV log data:", size=12, color=ft.Colors.GREY_700),
-                csv_text_field
-            ], tight=True, spacing=8),
+            title=ft.Text("Export Report", size=16, weight=ft.FontWeight.BOLD),
+            content=ft.Text("Choose your preferred export format:", size=13),
             actions=[
-                ft.TextButton("Copy CSV", on_click=copy_to_clipboard),
-                ft.TextButton("Close", on_click=close_dialog),
+                ft.ElevatedButton("Excel (.xlsx)", icon=ft.Icons.TABLE_CHART, on_click=handle_excel_gen, style=ft.ButtonStyle(color=ft.Colors.GREEN_800)),
+                ft.ElevatedButton("PDF Report (.pdf)", icon=ft.Icons.PICTURE_AS_PDF, on_click=handle_pdf_gen, style=ft.ButtonStyle(color=ft.Colors.RED_800)),
+                ft.TextButton("Cancel", on_click=close_dialog),
             ],
             actions_alignment=ft.MainAxisAlignment.END,
         )
@@ -284,9 +359,9 @@ def main(page: ft.Page):
 
     export_btn = ft.IconButton(
         icon=ft.Icons.DOWNLOAD, 
-        tooltip="Export CSV", 
+        tooltip="Export Data", 
         icon_color=ft.Colors.BLUE_800,
-        on_click=export_csv
+        on_click=open_export_menu
     )
 
     history_list = ft.ListView(spacing=10, expand=True)
