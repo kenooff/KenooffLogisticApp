@@ -9,7 +9,7 @@ from datetime import datetime
 
 # Excel & PDF Libraries
 import openpyxl
-from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.styles import Font, PatternFill, Alignment
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -19,7 +19,8 @@ from reportlab.lib import colors
 SUPABASE_URL = "https://nkllvhzebktydnqvjuoc.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5rbGx2aHplYmt0eWRucXZqdW9jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYyODQzNDMsImV4cCI6MjEwMTg2MDM0M30.zIPGzDv5krWPUaIJzTP2BnKhSxU5LjJ0DraR46zFFLI"
 
-def supabase_request(endpoint: str, method: str = "GET", data: dict = None):
+# Direct HTTP Helper with Retry Logic (Fixes DNS & Network dropped packet errors)
+def supabase_request(endpoint: str, method: str = "GET", data: dict = None, retries: int = 3):
     url = f"{SUPABASE_URL}/rest/v1/{endpoint}"
     headers = {
         "apikey": SUPABASE_KEY,
@@ -29,17 +30,24 @@ def supabase_request(endpoint: str, method: str = "GET", data: dict = None):
     }
     
     body = json.dumps(data).encode("utf-8") if data is not None else None
-    req = urllib.request.Request(url, data=body, headers=headers, method=method)
     
-    try:
-        with urllib.request.urlopen(req) as response:
-            res_data = response.read().decode("utf-8")
-            return json.loads(res_data) if res_data else []
-    except urllib.error.HTTPError as e:
-        err_msg = e.read().decode("utf-8")
-        raise Exception(f"HTTP {e.code}: {err_msg}")
-    except Exception as e:
-        raise Exception(str(e))
+    for attempt in range(retries):
+        try:
+            req = urllib.request.Request(url, data=body, headers=headers, method=method)
+            with urllib.request.urlopen(req, timeout=10) as response:
+                res_data = response.read().decode("utf-8")
+                return json.loads(res_data) if res_data else []
+        except urllib.error.HTTPError as e:
+            err_msg = e.read().decode("utf-8")
+            raise Exception(f"HTTP {e.code}: {err_msg}")
+        except urllib.error.URLError as e:
+            if attempt == retries - 1:
+                raise Exception("Network Connection Error: Please check your internet connection.")
+            time.sleep(1)
+        except Exception as e:
+            if attempt == retries - 1:
+                raise Exception(str(e))
+            time.sleep(1)
 
 def main(page: ft.Page):
     page.title = "Kenooff Logistics"
@@ -236,7 +244,7 @@ def main(page: ft.Page):
         dense=True
     )
 
-    # ==================== EXPORT FUNCTIONALITY (EXCEL & PDF) ====================
+    # ==================== EXPORT FUNCTIONALITY ====================
     def generate_excel():
         wb = openpyxl.Workbook()
         ws = wb.active
@@ -322,8 +330,8 @@ def main(page: ft.Page):
 
         def handle_excel_gen(e):
             try:
-                path = generate_excel()
-                show_alert(f"Excel report created successfully!", ft.Colors.GREEN_800)
+                generate_excel()
+                show_alert("Excel report created successfully!", ft.Colors.GREEN_800)
             except Exception as ex:
                 show_alert(f"Excel Export Error: {str(ex)}", ft.Colors.RED_600)
             dialog.open = False
@@ -331,8 +339,8 @@ def main(page: ft.Page):
 
         def handle_pdf_gen(e):
             try:
-                path = generate_pdf()
-                show_alert(f"PDF report generated successfully!", ft.Colors.GREEN_800)
+                generate_pdf()
+                show_alert("PDF report generated successfully!", ft.Colors.GREEN_800)
             except Exception as ex:
                 show_alert(f"PDF Export Error: {str(ex)}", ft.Colors.RED_600)
             dialog.open = False
