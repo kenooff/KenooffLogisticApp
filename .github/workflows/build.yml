@@ -31,13 +31,16 @@ jobs:
         with:
           channel: 'stable'
 
-      - name: Install dependencies and Flet CLI
+      - name: Install dependencies into Serious Python App Bundle
         run: |
           python -m pip install --upgrade pip
-          pip install flet[all]
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install serious_python
+          
+          # Force-install requirements directly into the app assets directory
+          mkdir -p app/src/main/python/lib
+          pip install -r requirements.txt --target app/src/main/python/lib --upgrade
 
-      - name: Build APK using Flet CLI
+      - name: Build APK with Flet
         run: |
           flet build apk --yes --verbose
 
