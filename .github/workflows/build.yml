@@ -1,53 +1,49 @@
 name: Build Android APK
-on: [push, workflow_dispatch]
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
 
-      - name: Install Linux Build & GTK Dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            clang \
-            cmake \
-            ninja-build \
-            pkg-config \
-            libgtk-3-dev \
-            liblzma-dev \
-            mesa-utils
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.10"
 
-      - name: Install Dependencies
-        run: pip install --upgrade flet supabase
-
-      - name: Setup Java
+      - name: Set up Java JDK
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Flutter
+      - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
+          channel: 'stable'
           flutter-version: '3.22.0'
 
-      - name: Accept Android Licenses
-        run: yes | flutter doctor --android-licenses || true
+      - name: Install dependencies and Flet CLI
+        run: |
+          python -m pip install --upgrade pip
+          pip install flet[all]
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-      - name: Build APK via Flet
-        run: flet build apk --yes --verbose
+      - name: Build APK using Flet CLI
+        run: |
+          flet build apk --verbose
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: app-release
+          name: KenooffLogisticsApp-APK
           path: build/apk/*.apk
-          if-no-files-found: error
